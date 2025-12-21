@@ -34,10 +34,16 @@ npm run build
 
 1.  将代码推送到 GitHub/GitLab。
 2.  在 Vercel控制台 导入项目。
-3.  在 **Settings > Environment Variables** 中添加：
+3.  **Framework Preset (框架预设) 选择**:
+    *   **自动检测**: 通常 Vercel 会根据 `package.json` 自动识别 (例如检测到 `vite` 会选 **Vite**，检测到 `react-scripts` 会选 **Create React App**)。
+    *   **手动选择**: 
+        *   如果使用 **Vite**，请选择 `Vite` (Output Directory 默认为 `dist`)。
+        *   如果使用 **Create React App**，请选择 `Create React App` (Output Directory 默认为 `build`)。
+        *   如果未识别，选择 `Other` 并根据实际构建结果文件夹手动填写 **Output Directory**。
+4.  在 **Settings > Environment Variables** 中添加：
     *   Key: `API_KEY` (注意：如果是前端直接调用，需确保构建工具配置允许暴露此 Key，或者使用 Vercel 的 Serverless Function 代理请求以保护 Key)
     *   *安全提示*: 当前 MVP 版本是在前端直接调用 Gemini API。生产环境建议将 API 调用逻辑移至 Next.js API Routes 或后端服务器，以防 API Key 泄露。
-4.  点击 **Deploy**。
+5.  点击 **Deploy**。
 
 ---
 
