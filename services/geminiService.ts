@@ -1,7 +1,7 @@
 import { TradeConfig, MarketState, AnalysisResult, StrategyType } from '../types';
 
 // OpenRouter Configuration
-const OPENROUTER_API_KEY = "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";
+const OPENROUTER_API_KEY = "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";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MODEL_ID = "google/gemini-3-flash-preview"; // As requested
 
