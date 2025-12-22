@@ -1,9 +1,9 @@
 import { TradeConfig, MarketState, AnalysisResult, StrategyType } from '../types';
 
 // OpenRouter Configuration
-const OPENROUTER_API_KEY = "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";
+const OPENROUTER_API_KEY = "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";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL_ID = "deepseek/deepseek-r1-0528:free"; // As requested
+const MODEL_ID = "google/gemini-3-flash-preview"; // As requested
 
 export const analyzeTrade = async (
   trade: TradeConfig,
