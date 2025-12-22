@@ -14,12 +14,18 @@ const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Apply theme class to body/html
+  // Apply theme class to body/html AND update iOS status bar color
   useEffect(() => {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
+      // Set status bar to gray-950 (#0d1117) for dark mode
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#0d1117');
     } else {
       document.documentElement.classList.remove('dark');
+      // Set status bar to white for light mode
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#ffffff');
     }
   }, [isDarkMode]);
 
