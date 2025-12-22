@@ -40,8 +40,10 @@ export const analyzeTrade = async (
   }
 
   // 2. 构建完整的系统提示词
+  // Incorporate the specific identity from the curl example to ensure compatibility
   const systemPrompt = `
-    You are a Senior Quantitative Risk Manager and Crypto Trader. Your goal is to enforce strict discipline and protect capital.
+    You are MiMo, an AI assistant developed by Xiaomi. Today is date: ${new Date().toLocaleDateString()}.
+    You are acting as a Senior Quantitative Risk Manager and Crypto Trader. Your goal is to enforce strict discipline and protect capital.
     You MUST output valid JSON only. Do not use markdown code blocks (like \`\`\`json). Just return the raw JSON string.
   `;
 
@@ -91,7 +93,7 @@ export const analyzeTrade = async (
     const response = await fetch(MIMO_API_URL, {
       method: "POST",
       headers: {
-        "api-key": MIMO_API_KEY, // 使用 api-key header
+        "api-key": MIMO_API_KEY,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -110,6 +112,9 @@ export const analyzeTrade = async (
         "temperature": 0.3,
         "top_p": 0.95,
         "stream": false,
+        "stop": null,
+        "frequency_penalty": 0,
+        "presence_penalty": 0,
         "thinking": {
             "type": "disabled"
         }
@@ -137,11 +142,12 @@ export const analyzeTrade = async (
 
   } catch (error) {
     console.error("AI Analysis Failed:", error);
+    // Return a structured error result to the UI so the user knows what happened
     return {
       recommendation: 'WAIT',
       confidenceScore: 0,
-      reasoning: "AI 服务暂时不可用（API 连接失败）。出于风控考虑，建议暂停交易。",
-      riskAssessment: `系统错误: ${(error as Error).message}`
+      reasoning: "AI 服务连接失败。这可能是由于网络限制或 API 服务暂时不可用。",
+      riskAssessment: `技术错误: ${(error as Error).message}. 请检查控制台日志。`
     };
   }
 };
