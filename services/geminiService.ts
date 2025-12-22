@@ -1,9 +1,9 @@
 import { TradeConfig, MarketState, AnalysisResult, StrategyType } from '../types';
 
 // OpenRouter Configuration
-const OPENROUTER_API_KEY = "sk-csig6oqi6gvqt62i7u0zsmijsgurkm7bmyz0jy870n0tv3hu";
-const OPENROUTER_URL = "https://api.xiaomimimo.com/v1/chat/completions";
-const MODEL_ID = "mimo-v2-flash"; // As requested
+const OPENROUTER_API_KEY = "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";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL_ID = "google/gemini-3-flash-preview"; // As requested
 
 export const analyzeTrade = async (
   trade: TradeConfig,
