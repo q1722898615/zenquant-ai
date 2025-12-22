@@ -1,9 +1,9 @@
 import { TradeConfig, MarketState, AnalysisResult, StrategyType } from '../types';
 
-// OpenRouter Configuration
-const OPENROUTER_API_KEY = "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";
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL_ID = "google/gemini-3-flash-preview"; // As requested
+// Xiaomi MiMo Configuration
+const MIMO_API_KEY = "sk-csig6oqi6gvqt62i7u0zsmijsgurkm7bmyz0jy870n0tv3hu";
+const MIMO_API_URL = "https://api.xiaomimimo.com/v1/chat/completions";
+const MODEL_ID = "mimo-v2-flash";
 
 export const analyzeTrade = async (
   trade: TradeConfig,
@@ -42,7 +42,7 @@ export const analyzeTrade = async (
   // 2. 构建完整的系统提示词
   const systemPrompt = `
     You are a Senior Quantitative Risk Manager and Crypto Trader. Your goal is to enforce strict discipline and protect capital.
-    You MUST output valid JSON only. No markdown formatting, no code blocks.
+    You MUST output valid JSON only. Do not use markdown code blocks (like \`\`\`json). Just return the raw JSON string.
   `;
 
   // 3. 构建用户输入提示词
@@ -88,12 +88,10 @@ export const analyzeTrade = async (
   `;
 
   try {
-    const response = await fetch(OPENROUTER_URL, {
+    const response = await fetch(MIMO_API_URL, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "https://zenquant.app", // Optional: identifies the app to OpenRouter
-        "X-Title": "ZenQuant",
+        "api-key": MIMO_API_KEY, // 使用 api-key header
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -108,12 +106,19 @@ export const analyzeTrade = async (
             "content": userPrompt
           }
         ],
-        "response_format": { "type": "json_object" } // Enforce JSON mode
+        "max_completion_tokens": 1024,
+        "temperature": 0.3,
+        "top_p": 0.95,
+        "stream": false,
+        "thinking": {
+            "type": "disabled"
+        }
       })
     });
 
     if (!response.ok) {
-      throw new Error(`OpenRouter API Error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`MIMO API Error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -122,16 +127,20 @@ export const analyzeTrade = async (
     if (!content) throw new Error("No content received from AI");
 
     // Clean up potential markdown code blocks if the model ignores the instruction
-    const cleanJson = content.replace(/```json\n?|\n?```/g, "").trim();
+    const cleanJson = content.replace(/```json\n?|```/g, "").trim();
     
-    return JSON.parse(cleanJson) as AnalysisResult;
+    // Attempt to extract JSON if there's extra text
+    const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
+    const jsonString = jsonMatch ? jsonMatch[0] : cleanJson;
+
+    return JSON.parse(jsonString) as AnalysisResult;
 
   } catch (error) {
     console.error("AI Analysis Failed:", error);
     return {
       recommendation: 'WAIT',
       confidenceScore: 0,
-      reasoning: "AI 服务暂时不可用（OpenRouter 连接失败）。出于风控考虑，建议暂停交易。",
+      reasoning: "AI 服务暂时不可用（API 连接失败）。出于风控考虑，建议暂停交易。",
       riskAssessment: `系统错误: ${(error as Error).message}`
     };
   }
