@@ -2,7 +2,11 @@ import { TradeConfig, MarketState, AnalysisResult, StrategyType } from '../types
 
 // Xiaomi MiMo Configuration
 const MIMO_API_KEY = "sk-csig6oqi6gvqt62i7u0zsmijsgurkm7bmyz0jy870n0tv3hu";
-const MIMO_API_URL = "https://api.xiaomimimo.com/v1/chat/completions";
+// 使用 CORS 代理绕过浏览器的同源策略限制 (CORS Issue)
+// 原始地址: https://api.xiaomimimo.com/v1/chat/completions
+// 浏览器会先发送 OPTIONS 请求，如果服务器不支持跨域，POST 请求会被拦截。
+// 通过 corsproxy.io 转发可以解决这个问题。
+const MIMO_API_URL = "https://corsproxy.io/?https://api.xiaomimimo.com/v1/chat/completions";
 const MODEL_ID = "mimo-v2-flash";
 
 export const analyzeTrade = async (
@@ -40,7 +44,6 @@ export const analyzeTrade = async (
   }
 
   // 2. 构建完整的系统提示词
-  // Incorporate the specific identity from the curl example to ensure compatibility
   const systemPrompt = `
     You are MiMo, an AI assistant developed by Xiaomi. Today is date: ${new Date().toLocaleDateString()}.
     You are acting as a Senior Quantitative Risk Manager and Crypto Trader. Your goal is to enforce strict discipline and protect capital.
@@ -90,6 +93,9 @@ export const analyzeTrade = async (
   `;
 
   try {
+    // Console log to help debugging
+    console.log("[GeminiService] Sending request to MiMo via Proxy...");
+
     const response = await fetch(MIMO_API_URL, {
       method: "POST",
       headers: {
@@ -123,10 +129,13 @@ export const analyzeTrade = async (
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[GeminiService] API Error Status: ${response.status}`, errorText);
       throw new Error(`MIMO API Error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log("[GeminiService] Response received:", data);
+
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) throw new Error("No content received from AI");
@@ -142,12 +151,20 @@ export const analyzeTrade = async (
 
   } catch (error) {
     console.error("AI Analysis Failed:", error);
+    
+    let errorMessage = "AI 服务连接失败。";
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+        errorMessage = "网络请求被拦截 (CORS)。正在尝试通过代理连接，如果依然失败，请检查网络设置。";
+    } else {
+        errorMessage = `技术错误: ${(error as Error).message}`;
+    }
+
     // Return a structured error result to the UI so the user knows what happened
     return {
       recommendation: 'WAIT',
       confidenceScore: 0,
-      reasoning: "AI 服务连接失败。这可能是由于网络限制或 API 服务暂时不可用。",
-      riskAssessment: `技术错误: ${(error as Error).message}. 请检查控制台日志。`
+      reasoning: "AI 服务暂时不可用。",
+      riskAssessment: errorMessage
     };
   }
 };
