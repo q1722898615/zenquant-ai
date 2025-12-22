@@ -1,14 +1,16 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { TradeConfig, MarketState, AnalysisResult, StrategyType } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// OpenRouter Configuration
+const OPENROUTER_API_KEY = "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";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL_ID = "google/gemini-3-flash-preview"; // As requested
 
 export const analyzeTrade = async (
   trade: TradeConfig,
   market: MarketState
 ): Promise<AnalysisResult> => {
   
-  // 根据策略类型动态生成特定的验证逻辑
+  // 1. 构建策略特定的验证逻辑说明
   let strategyLogicInstructions = "";
 
   if (trade.strategy === StrategyType.MACD_RSI_COMPOSITE) {
@@ -29,7 +31,6 @@ export const analyzeTrade = async (
     Task: Explicitly count how many conditions are met for the user's requested side (${trade.side}). If < 2 conditions met, recommend WAIT.
     `;
   } else {
-    // Default logic for other strategies
     strategyLogicInstructions = `
     General Validation for ${trade.strategy}:
     - Check trend alignment using MAs.
@@ -38,9 +39,14 @@ export const analyzeTrade = async (
     `;
   }
 
-  const prompt = `
+  // 2. 构建完整的系统提示词
+  const systemPrompt = `
     You are a Senior Quantitative Risk Manager and Crypto Trader. Your goal is to enforce strict discipline and protect capital.
-    
+    You MUST output valid JSON only. No markdown formatting, no code blocks.
+  `;
+
+  // 3. 构建用户输入提示词
+  const userPrompt = `
     Current Market Data for ${trade.symbol}:
     - Price: ${market.currentPrice}
     - RSI (14): ${market.rsi}
@@ -71,40 +77,62 @@ export const analyzeTrade = async (
     4. Provide a strictly disciplined recommendation.
     5. **IMPORTANT**: Output all text fields (reasoning, riskAssessment, suggestedAdjustments) in Simplified Chinese (简体中文).
 
-    Return JSON format only.
+    REQUIRED JSON OUTPUT STRUCTURE:
+    {
+      "recommendation": "EXECUTE" | "WAIT" | "CANCEL",
+      "confidenceScore": number (0-100),
+      "reasoning": "string",
+      "riskAssessment": "string",
+      "suggestedAdjustments": "string"
+    }
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            recommendation: { type: Type.STRING, enum: ['EXECUTE', 'WAIT', 'CANCEL'] },
-            confidenceScore: { type: Type.NUMBER, description: "0 to 100" },
-            reasoning: { type: Type.STRING, description: "Detailed reasoning in Chinese" },
-            riskAssessment: { type: Type.STRING, description: "Risk analysis in Chinese" },
-            suggestedAdjustments: { type: Type.STRING, description: "Adjustments in Chinese (optional)" }
+    const response = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "HTTP-Referer": "https://zenquant.app", // Optional: identifies the app to OpenRouter
+        "X-Title": "ZenQuant",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "model": MODEL_ID,
+        "messages": [
+          {
+            "role": "system",
+            "content": systemPrompt
           },
-          required: ['recommendation', 'confidenceScore', 'reasoning', 'riskAssessment']
-        }
-      }
+          {
+            "role": "user",
+            "content": userPrompt
+          }
+        ],
+        "response_format": { "type": "json_object" } // Enforce JSON mode
+      })
     });
 
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (!response.ok) {
+      throw new Error(`OpenRouter API Error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) throw new Error("No content received from AI");
+
+    // Clean up potential markdown code blocks if the model ignores the instruction
+    const cleanJson = content.replace(/```json\n?|\n?```/g, "").trim();
     
-    return JSON.parse(text) as AnalysisResult;
+    return JSON.parse(cleanJson) as AnalysisResult;
+
   } catch (error) {
     console.error("AI Analysis Failed:", error);
     return {
       recommendation: 'WAIT',
       confidenceScore: 0,
-      reasoning: "AI 服务暂时不可用。出于风控考虑，建议暂停交易。",
-      riskAssessment: "系统错误导致无法计算风险参数。"
+      reasoning: "AI 服务暂时不可用（OpenRouter 连接失败）。出于风控考虑，建议暂停交易。",
+      riskAssessment: `系统错误: ${(error as Error).message}`
     };
   }
 };
