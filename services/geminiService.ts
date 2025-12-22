@@ -1,13 +1,9 @@
 import { TradeConfig, MarketState, AnalysisResult, StrategyType } from '../types';
 
-// Xiaomi MiMo Configuration
-const MIMO_API_KEY = "sk-csig6oqi6gvqt62i7u0zsmijsgurkm7bmyz0jy870n0tv3hu";
-// 使用 CORS 代理绕过浏览器的同源策略限制 (CORS Issue)
-// 原始地址: https://api.xiaomimimo.com/v1/chat/completions
-// 浏览器会先发送 OPTIONS 请求，如果服务器不支持跨域，POST 请求会被拦截。
-// 通过 corsproxy.io 转发可以解决这个问题。
-const MIMO_API_URL = "https://corsproxy.io/?https://api.xiaomimimo.com/v1/chat/completions";
-const MODEL_ID = "mimo-v2-flash";
+// OpenRouter Configuration
+const OPENROUTER_API_KEY = "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";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL_ID = "deepseek/deepseek-r1-0528:free"; // As requested
 
 export const analyzeTrade = async (
   trade: TradeConfig,
@@ -45,9 +41,8 @@ export const analyzeTrade = async (
 
   // 2. 构建完整的系统提示词
   const systemPrompt = `
-    You are MiMo, an AI assistant developed by Xiaomi. Today is date: ${new Date().toLocaleDateString()}.
-    You are acting as a Senior Quantitative Risk Manager and Crypto Trader. Your goal is to enforce strict discipline and protect capital.
-    You MUST output valid JSON only. Do not use markdown code blocks (like \`\`\`json). Just return the raw JSON string.
+    You are a Senior Quantitative Risk Manager and Crypto Trader. Your goal is to enforce strict discipline and protect capital.
+    You MUST output valid JSON only. No markdown formatting, no code blocks.
   `;
 
   // 3. 构建用户输入提示词
@@ -93,13 +88,12 @@ export const analyzeTrade = async (
   `;
 
   try {
-    // Console log to help debugging
-    console.log("[GeminiService] Sending request to MiMo via Proxy...");
-
-    const response = await fetch(MIMO_API_URL, {
+    const response = await fetch(OPENROUTER_URL, {
       method: "POST",
       headers: {
-        "api-key": MIMO_API_KEY,
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "HTTP-Referer": "https://zenquant.app", // Optional: identifies the app to OpenRouter
+        "X-Title": "ZenQuant",
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -114,57 +108,31 @@ export const analyzeTrade = async (
             "content": userPrompt
           }
         ],
-        "max_completion_tokens": 1024,
-        "temperature": 0.3,
-        "top_p": 0.95,
-        "stream": false,
-        "stop": null,
-        "frequency_penalty": 0,
-        "presence_penalty": 0,
-        "thinking": {
-            "type": "disabled"
-        }
+        "response_format": { "type": "json_object" } // Enforce JSON mode
       })
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[GeminiService] API Error Status: ${response.status}`, errorText);
-      throw new Error(`MIMO API Error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenRouter API Error: ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log("[GeminiService] Response received:", data);
-
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) throw new Error("No content received from AI");
 
     // Clean up potential markdown code blocks if the model ignores the instruction
-    const cleanJson = content.replace(/```json\n?|```/g, "").trim();
+    const cleanJson = content.replace(/```json\n?|\n?```/g, "").trim();
     
-    // Attempt to extract JSON if there's extra text
-    const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
-    const jsonString = jsonMatch ? jsonMatch[0] : cleanJson;
-
-    return JSON.parse(jsonString) as AnalysisResult;
+    return JSON.parse(cleanJson) as AnalysisResult;
 
   } catch (error) {
     console.error("AI Analysis Failed:", error);
-    
-    let errorMessage = "AI 服务连接失败。";
-    if (error instanceof TypeError && error.message === "Failed to fetch") {
-        errorMessage = "网络请求被拦截 (CORS)。正在尝试通过代理连接，如果依然失败，请检查网络设置。";
-    } else {
-        errorMessage = `技术错误: ${(error as Error).message}`;
-    }
-
-    // Return a structured error result to the UI so the user knows what happened
     return {
       recommendation: 'WAIT',
       confidenceScore: 0,
-      reasoning: "AI 服务暂时不可用。",
-      riskAssessment: errorMessage
+      reasoning: "AI 服务暂时不可用（OpenRouter 连接失败）。出于风控考虑，建议暂停交易。",
+      riskAssessment: `系统错误: ${(error as Error).message}`
     };
   }
 };
