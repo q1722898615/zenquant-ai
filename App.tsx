@@ -261,7 +261,11 @@ export const App: React.FC = () => {
 
         {/* === Scrollable Content (Flex 1) === */}
         {/* FIX 1: Removed overscroll-y-contain to allow natural bounce even when empty */}
-        <div className={`flex-1 overflow-y-auto w-full relative ${isDetailViewOpen ? 'pointer-events-none' : ''}`}>
+        {/* FIX 2: Removed conditional pointer-events-none (was causing stuck scrolling). Added touch-pan-y and WebkitOverflowScrolling for mobile smoothness. */}
+        <div 
+          className="flex-1 overflow-y-auto w-full relative touch-pan-y" 
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {/* Added min-h-[101%] to force scrollability for bounce effect */}
           <main className="py-6 px-4 sm:px-6 lg:px-8 pb-32 min-h-[101%]">
             <div className="max-w-7xl mx-auto animate-fade-in h-full">
