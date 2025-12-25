@@ -33,6 +33,19 @@ export const Dashboard: React.FC<Props> = ({ config, onComplete }) => {
         
         setAnalysis(aiResult);
         setLoadingStep('');
+        
+        // Save record silently when analysis is done
+        if (market && aiResult) {
+           const record: AnalysisRecord = {
+            id: crypto.randomUUID(),
+            timestamp: Date.now(),
+            config,
+            market: market,
+            analysis: aiResult
+          };
+          onComplete(record);
+        }
+
       } catch (e: any) {
         console.error(e);
         setErrorMsg(e.message || '连接服务器失败');
@@ -42,19 +55,6 @@ export const Dashboard: React.FC<Props> = ({ config, onComplete }) => {
 
     runAnalysis();
   }, [config]);
-
-  const handleFinish = () => {
-    if (marketState && analysis) {
-      const record: AnalysisRecord = {
-        id: crypto.randomUUID(),
-        timestamp: Date.now(),
-        config,
-        market: marketState,
-        analysis
-      };
-      onComplete(record);
-    }
-  };
 
   if (loadingStep) {
     return (
@@ -97,17 +97,6 @@ export const Dashboard: React.FC<Props> = ({ config, onComplete }) => {
 
   return (
     <div className="relative pt-12">
-        {/* Floating Done/Exit Button for Dashboard (since we removed the button from AnalysisView) */}
-        <button 
-          onClick={handleFinish}
-          className="fixed top-6 right-4 z-50 px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full font-bold shadow-xl border border-transparent hover:scale-105 transition-transform flex items-center gap-2"
-        >
-          <span>完成</span>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-        </button>
-
         <AnalysisView 
           config={config} 
           marketState={marketState} 
