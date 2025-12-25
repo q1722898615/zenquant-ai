@@ -111,7 +111,7 @@ export const App: React.FC = () => {
     if (!isDetailViewOpen) return;
 
     const startX = e.touches[0].clientX;
-    // Increased sensitivity threshold from 40px to 70px
+    // Sensitivity threshold: 70px from left edge
     if (startX < 70) {
       touchStartX.current = startX;
       setIsSwiping(true);
@@ -138,7 +138,7 @@ export const App: React.FC = () => {
     setIsSwiping(false);
     touchStartX.current = null;
 
-    // Threshold to close: 35% of screen width (more sensitive)
+    // Threshold to close: 35% of screen width
     if (swipeX > screenWidth * 0.35) {
       // Animate out
       setSwipeX(screenWidth); 
@@ -156,23 +156,21 @@ export const App: React.FC = () => {
   // --- Animation Styles Calculation ---
   
   const progress = Math.min(Math.max(swipeX / screenWidth, 0), 1);
-  const homeScale = 0.92 + (0.08 * progress); // 0.92 -> 1.0
-  const homeOpacity = isDetailViewOpen ? (0.5 + (0.5 * progress)) : 1;
-  const homeBorderRadius = isDetailViewOpen && progress < 1 ? '16px' : '0px';
+  
+  // REFACTOR: Removed scaling. 
+  // Just use brightness filter for depth.
+  // When progress = 0 (Detail fully open), brightness = 0.7
+  // When progress = 1 (Detail fully closed/swiped away), brightness = 1
+  const homeFilter = isDetailViewOpen ? `brightness(${0.7 + 0.3 * progress})` : 'none';
 
   // 1. Home View Styles (Background Layer)
   const homeStyle: React.CSSProperties = {
-    transform: `scale(${isDetailViewOpen ? homeScale : 1})`,
-    opacity: homeOpacity,
-    borderRadius: homeBorderRadius,
-    filter: isDetailViewOpen ? `brightness(${0.8 + 0.2 * progress})` : 'none',
-    transition: isSwiping ? 'none' : 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.4s, filter 0.4s, border-radius 0.4s',
+    // transform: 'scale(1)', // Explicitly no scale
+    filter: homeFilter,
+    transition: isSwiping ? 'none' : 'filter 0.4s ease',
     overflow: 'hidden',
-    height: '100dvh', // Use dynamic viewport height for mobile browsers
-    width: '100vw',
     position: 'absolute',
-    top: 0,
-    left: 0,
+    inset: 0, // top:0, right:0, bottom:0, left:0
     zIndex: 0,
     backgroundColor: isDarkMode ? '#101624' : '#FEFEFE' 
   };
@@ -180,15 +178,11 @@ export const App: React.FC = () => {
   // 2. Detail View Styles (Foreground Layer)
   const detailStyle: React.CSSProperties = {
     transform: `translateX(${swipeX}px)`,
-    transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.15, 0.85, 0.15, 1)', // Smoother iOS-like curve
+    transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.15, 0.85, 0.15, 1)',
     position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    inset: 0,
     zIndex: 50,
     backgroundColor: isDarkMode ? '#0A0F17' : '#FFFFFF',
-    // Strong shadow to separate layers (Like Figure 2)
     boxShadow: '-16px 0 40px -10px rgba(0,0,0,0.5)' 
   };
 
@@ -209,14 +203,14 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-[100dvh] font-sans overflow-hidden bg-black`}>
+    // FIX 1: Root container is fixed inset-0 to prevent browser rubber-band effect on the whole page
+    <div className={`fixed inset-0 font-sans overflow-hidden bg-black overscroll-none`}>
       
-      {/* --- LAYER 1: HOME VIEW (SCALES IN BACKGROUND) --- */}
-      <div style={homeStyle} className="flex flex-col">
+      {/* --- LAYER 1: HOME VIEW (Fixed Background) --- */}
+      <div style={homeStyle} className="flex flex-col w-full h-full">
         
-        {/* === Header (FIXED at Top of Home Layer) === */}
-        {/* We place it here so it scales WITH the home view but stays top of content */}
-        <div className="flex-none absolute top-0 left-0 right-0 z-40">
+        {/* === Header (Flex Item, Fixed height) === */}
+        <div className="flex-none z-10 w-full">
            {/* Mobile Header */}
           <nav className="md:hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3">
             <div className="flex items-center gap-3">
@@ -269,10 +263,11 @@ export const App: React.FC = () => {
           </nav>
         </div>
 
-        {/* === Scrollable Content (Middle) === */}
-        {/* Added padding top (pt-16) to account for absolute header, and padding bottom (pb-24) for floating bar */}
-        <div className={`flex-1 overflow-y-auto pt-16 pb-24 ${isDetailViewOpen ? 'pointer-events-none' : ''}`}>
-          <main className="py-6 px-4 sm:px-6 lg:px-8">
+        {/* === Scrollable Content (Flex 1) === */}
+        {/* FIX 2: Ensure this area takes all remaining height and scrolls internally */}
+        {/* overscroll-y-contain prevents the scroll from chaining to the parent and moving the whole page */}
+        <div className={`flex-1 overflow-y-auto overscroll-y-contain w-full relative ${isDetailViewOpen ? 'pointer-events-none' : ''}`}>
+          <main className="py-6 px-4 sm:px-6 lg:px-8 pb-32">
             <div className="max-w-7xl mx-auto animate-fade-in">
               {isLoadingHistory ? (
                 <div className="flex flex-col items-center justify-center min-h-[300px] text-gray-400">
@@ -326,8 +321,8 @@ export const App: React.FC = () => {
           </main>
         </div>
 
-        {/* === Floating Action Bar (FIXED at Bottom of Home Layer) === */}
-        {/* Positioned absolutely within the 100dvh container so it doesn't scroll with content */}
+        {/* === Floating Action Bar (Fixed at Bottom of Home Layer) === */}
+        {/* Absolute position relative to the Home Container, not the screen, but since Home is fixed, it acts fixed */}
         <div className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 z-40 transition-opacity duration-300 ${isDetailViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full px-2 py-2 flex items-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-100 dark:border-gray-700">
             <button className="w-12 h-12 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
@@ -360,7 +355,7 @@ export const App: React.FC = () => {
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
-          className="overflow-y-auto custom-scrollbar"
+          className="overflow-y-auto custom-scrollbar overscroll-y-contain"
         >
           {/* Fixed Floating Back Button */}
           <button 
