@@ -11,6 +11,17 @@ interface Props {
 export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children }) => {
   const [visible, setVisible] = useState(false);
   const [animate, setAnimate] = useState(false);
+  
+  // Cache content to persist it during the exit animation
+  const [cachedState, setCachedState] = useState<{ title?: string; children: React.ReactNode } | null>(null);
+
+  // Sync Cached State ONLY when open. 
+  // When closing (isOpen=false), we stop updating this to preserve the last valid state.
+  useEffect(() => {
+    if (isOpen) {
+      setCachedState({ title, children });
+    }
+  }, [isOpen, title, children]);
 
   // Sync Theme Color with Drawer State
   useEffect(() => {
@@ -54,6 +65,12 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
 
   if (!visible) return null;
 
+  // Key Logic for Smooth Exit:
+  // If isOpen is true, use live props (and update cache).
+  // If isOpen is false (closing), ignore live props (which might be null/empty) and use the cached valid content.
+  const displayTitle = isOpen ? title : cachedState?.title;
+  const displayChildren = isOpen ? children : cachedState?.children;
+
   return (
     <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center pointer-events-none">
       {/* Backdrop */}
@@ -79,12 +96,6 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
           }
         `}
       >
-        {/* Note on classes above: 
-            On mobile (default), we want 'translate-y-full' with 'opacity-100' for exit state.
-            This ensures the drawer looks like a solid object sliding down, rather than fading out while sliding.
-            On desktop (md), we use 'opacity-0' with a small slide for a modal fade effect.
-        */}
-
         {/* Mobile Handle Bar */}
         <div className="md:hidden w-full flex justify-center pt-3 pb-1 cursor-pointer" onClick={onClose}>
           <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
@@ -92,7 +103,7 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
 
         {/* Header */}
         <div className="flex justify-between items-center p-4 md:p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{displayTitle}</h2>
           <button 
             onClick={onClose}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors"
@@ -105,7 +116,7 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-5 md:p-8 custom-scrollbar">
-          {children}
+          {displayChildren}
         </div>
       </div>
     </div>
