@@ -2,20 +2,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TradeConfig, TradeSide, Strategy, SymbolData } from '../types';
 import { calculatePositionSize } from '../utils/calculations';
-import { fetchStrategies } from '../services/strategyService';
-import { fetchPopularSymbols, searchSymbols } from '../services/marketService';
+import { searchSymbols } from '../services/marketService';
 
 interface Props {
   onNext: (config: TradeConfig) => void;
   onBack: () => void;
+  strategies: Strategy[]; // Received from parent
+  popularSymbols: SymbolData[]; // Received from parent
 }
 
-export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
-  // Data State
-  const [availableStrategies, setAvailableStrategies] = useState<Strategy[]>([]);
-  const [popularSymbols, setPopularSymbols] = useState<SymbolData[]>([]);
+export const TradeForm: React.FC<Props> = ({ onNext, onBack, strategies, popularSymbols }) => {
+  // UI States
   const [displaySymbols, setDisplaySymbols] = useState<SymbolData[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
   
   // Dropdown States
   const [isSymbolDropdownOpen, setIsSymbolDropdownOpen] = useState(false);
@@ -40,29 +38,18 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
 
   const [positionSize, setPositionSize] = useState<{ quantity: number, notional: number, margin: number } | null>(null);
 
-  // Load backend data on mount
+  // Initialize display symbols & default strategy
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [strategies, symbols] = await Promise.all([
-          fetchStrategies(),
-          fetchPopularSymbols()
-        ]);
-        setAvailableStrategies(strategies);
-        setPopularSymbols(symbols);
-        setDisplaySymbols(symbols);
-        
-        if (strategies.length > 0) {
-          handleChange('strategy', strategies[0].name);
-        }
-      } catch (error) {
-        console.error("Failed to load initial data", error);
-      } finally {
-        setIsLoadingData(false);
-      }
-    };
-    loadData();
-  }, []);
+    // Set initial display symbols
+    if (popularSymbols.length > 0) {
+      setDisplaySymbols(popularSymbols);
+    }
+    
+    // Set default strategy if none selected and strategies exist
+    if (!config.strategy && strategies.length > 0) {
+      handleChange('strategy', strategies[0].name);
+    }
+  }, [strategies, popularSymbols]); // Only run when props update (or on mount)
 
   // Handle Click Outside for both dropdowns
   useEffect(() => {
@@ -137,11 +124,7 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
 
   const isFormValid = config.entryPrice > 0 && config.stopLoss > 0 && config.takeProfit > 0 && config.symbol.length > 0 && config.strategy.length > 0;
 
-  if (isLoadingData) {
-    return <div className="p-10 text-center text-gray-500 animate-pulse">正在连接量化引擎...</div>;
-  }
-
-  const currentStrategyDesc = availableStrategies.find(s => s.name === config.strategy)?.description;
+  const currentStrategyDesc = strategies.find(s => s.name === config.strategy)?.description;
 
   // Define unified styles
   const LABEL_STYLE = "block text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium tracking-wide";
@@ -238,7 +221,7 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
             {isStrategyDropdownOpen && (
               <div className={DROPDOWN_MENU_STYLE}>
                 <ul>
-                  {availableStrategies.map(s => (
+                  {strategies.map(s => (
                     <li 
                       key={s.id}
                       onClick={() => selectStrategy(s.name)}

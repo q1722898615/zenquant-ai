@@ -5,30 +5,47 @@ import { TradeForm } from './components/TradeForm';
 import { Dashboard } from './components/Dashboard';
 import { AnalysisView } from './components/AnalysisView';
 import { ModalDrawer } from './components/ModalDrawer';
-import { AppStep, TradeConfig, AnalysisRecord, TradeSide } from './types';
+import { AppStep, TradeConfig, AnalysisRecord, TradeSide, Strategy, SymbolData } from './types';
 import { fetchAnalysisHistory } from './services/analysisService';
+import { fetchStrategies } from './services/strategyService';
+import { fetchPopularSymbols } from './services/marketService';
 
 export const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.HOME);
   const [tradeConfig, setTradeConfig] = useState<TradeConfig | null>(null);
+  
+  // Data States (Lifted Up)
   const [history, setHistory] = useState<AnalysisRecord[]>([]);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [popularSymbols, setPopularSymbols] = useState<SymbolData[]>([]);
+  
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState<AnalysisRecord | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Load History from Backend
+  // Load All Initial Data (History + Form Dependencies)
   useEffect(() => {
-    const loadHistory = async () => {
+    const loadInitialData = async () => {
       setIsLoadingHistory(true);
       try {
-        const records = await fetchAnalysisHistory(20);
+        // Fetch in parallel for speed
+        const [records, stratData, symbolData] = await Promise.all([
+          fetchAnalysisHistory(20),
+          fetchStrategies(),
+          fetchPopularSymbols()
+        ]);
+        
         setHistory(records);
+        setStrategies(stratData);
+        setPopularSymbols(symbolData);
+      } catch (error) {
+        console.error("Failed to load initial data", error);
       } finally {
         setIsLoadingHistory(false);
       }
     };
-    loadHistory();
+    loadInitialData();
   }, []);
 
   // Apply theme class to body/html AND update iOS status bar color
@@ -66,8 +83,6 @@ export const App: React.FC = () => {
     setTradeConfig(null);
 
     // REFETCH Source of Truth from Backend
-    // This ensures the list view exactly matches what is stored in the DB,
-    // fixing any discrepancies between the "temporary analysis result" and the "saved record".
     setIsLoadingHistory(true);
     try {
       const records = await fetchAnalysisHistory(20);
@@ -272,6 +287,8 @@ export const App: React.FC = () => {
             <TradeForm 
               onNext={handleTradeConfigSubmit} 
               onBack={() => setStep(AppStep.PSYCHOLOGY_CHECK)}
+              strategies={strategies}
+              popularSymbols={popularSymbols}
             />
           )}
         </ModalDrawer>
