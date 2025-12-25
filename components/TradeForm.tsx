@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TradeConfig, TradeSide, Strategy, SymbolData } from '../types';
 import { calculatePositionSize } from '../utils/calculations';
 import { fetchStrategies } from '../services/strategyService';
-import { fetchPopularSymbols } from '../services/marketService';
+import { fetchPopularSymbols, searchSymbols } from '../services/marketService';
 
 interface Props {
   onNext: (config: TradeConfig) => void;
@@ -14,11 +14,19 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
   // Data State
   const [availableStrategies, setAvailableStrategies] = useState<Strategy[]>([]);
   const [popularSymbols, setPopularSymbols] = useState<SymbolData[]>([]);
+  const [displaySymbols, setDisplaySymbols] = useState<SymbolData[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  
+  // Dropdown States
+  const [isSymbolDropdownOpen, setIsSymbolDropdownOpen] = useState(false);
+  const [isStrategyDropdownOpen, setIsStrategyDropdownOpen] = useState(false);
+  
+  const symbolDropdownRef = useRef<HTMLDivElement>(null);
+  const strategyDropdownRef = useRef<HTMLDivElement>(null);
 
   // Form State
   const [config, setConfig] = useState<TradeConfig>({
-    symbol: 'BTC',
+    symbol: 'BTC/USDT', // Default to full pair format
     side: TradeSide.LONG,
     timeframe: '15m',
     entryPrice: 0,
@@ -27,7 +35,7 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
     accountBalance: 10000,
     riskPercentage: 1,
     leverage: 1,
-    strategy: '' // Initial empty
+    strategy: ''
   });
 
   const [positionSize, setPositionSize] = useState<{ quantity: number, notional: number, margin: number } | null>(null);
@@ -42,8 +50,8 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
         ]);
         setAvailableStrategies(strategies);
         setPopularSymbols(symbols);
+        setDisplaySymbols(symbols);
         
-        // Set default strategy if available
         if (strategies.length > 0) {
           handleChange('strategy', strategies[0].name);
         }
@@ -56,8 +64,48 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
     loadData();
   }, []);
 
+  // Handle Click Outside for both dropdowns
   useEffect(() => {
-    // Auto-calculate position size based on risk
+    const handleClickOutside = (event: MouseEvent) => {
+      if (symbolDropdownRef.current && !symbolDropdownRef.current.contains(event.target as Node)) {
+        setIsSymbolDropdownOpen(false);
+      }
+      if (strategyDropdownRef.current && !strategyDropdownRef.current.contains(event.target as Node)) {
+        setIsStrategyDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Symbol Search Logic
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!config.symbol) {
+        setDisplaySymbols(popularSymbols);
+        return;
+      }
+      // If exact match, don't filter out everything else immediately or just keep it
+      const exactMatch = popularSymbols.find(s => s.symbol === config.symbol);
+      if (exactMatch) return;
+
+      const localMatches = popularSymbols.filter(s => 
+        s.symbol.toLowerCase().includes(config.symbol.toLowerCase()) || 
+        s.base_currency.toLowerCase().includes(config.symbol.toLowerCase())
+      );
+
+      if (localMatches.length > 0) {
+        setDisplaySymbols(localMatches);
+      } else {
+        const apiResults = await searchSymbols(config.symbol);
+        setDisplaySymbols(apiResults.length > 0 ? apiResults : []);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [config.symbol, popularSymbols]);
+
+  useEffect(() => {
     const size = calculatePositionSize(
       config.accountBalance,
       config.riskPercentage,
@@ -72,9 +120,20 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSymbolChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSymbolInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase();
     handleChange('symbol', val);
+    setIsSymbolDropdownOpen(true);
+  };
+
+  const selectSymbol = (symbolStr: string) => {
+    handleChange('symbol', symbolStr);
+    setIsSymbolDropdownOpen(false);
+  };
+
+  const selectStrategy = (strategyName: string) => {
+    handleChange('strategy', strategyName);
+    setIsStrategyDropdownOpen(false);
   };
 
   const isFormValid = config.entryPrice > 0 && config.stopLoss > 0 && config.takeProfit > 0 && config.symbol.length > 0 && config.strategy.length > 0;
@@ -82,6 +141,8 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
   if (isLoadingData) {
     return <div className="p-10 text-center text-gray-500 animate-pulse">正在连接量化引擎...</div>;
   }
+
+  const currentStrategyDesc = availableStrategies.find(s => s.name === config.strategy)?.description;
 
   return (
     <div className="animate-fade-in-up">
@@ -104,45 +165,98 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Column: Asset & Strategy */}
         <div className="space-y-4">
-          <div>
+          
+          {/* Custom Symbol Search Dropdown */}
+          <div ref={symbolDropdownRef} className="relative z-20">
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">交易标的 (Symbol)</label>
             <div className="relative">
               <input
                 type="text"
-                list="symbol-suggestions"
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white font-bold focus:border-trade-accent outline-none transition-colors uppercase"
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white font-bold focus:border-trade-accent focus:ring-2 focus:ring-trade-accent/20 outline-none transition-all uppercase"
                 value={config.symbol}
-                onChange={handleSymbolChange}
-                placeholder="例如: BTC, ETH..."
+                onChange={handleSymbolInputChange}
+                onFocus={() => setIsSymbolDropdownOpen(true)}
+                placeholder="BTC/USDT"
               />
-              <datalist id="symbol-suggestions">
-                {popularSymbols.map(sym => (
-                  <option key={sym.id} value={sym.base_currency} />
-                ))}
-              </datalist>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
-                USDT
-              </div>
+              {/* Removed fixed suffix to allow full pair editing */}
             </div>
+
+            {isSymbolDropdownOpen && (
+              <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 max-h-60 overflow-y-auto custom-scrollbar animate-fade-in">
+                {displaySymbols.length > 0 ? (
+                  <ul>
+                    {displaySymbols.map((sym) => (
+                      <li 
+                        key={sym.id}
+                        onClick={() => selectSymbol(sym.symbol)} // Use full symbol (e.g. BTC/USDT)
+                        className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer flex justify-between items-center transition-colors border-b border-gray-50 dark:border-gray-700/50 last:border-0 group"
+                      >
+                        <div className="flex items-center gap-3">
+                           <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold">
+                              {sym.base_currency.substring(0, 1)}
+                           </div>
+                           <div>
+                              <p className="font-bold text-gray-900 dark:text-white text-sm">{sym.base_currency}</p>
+                              <p className="text-[10px] text-gray-400 group-hover:text-gray-500">{sym.symbol}</p>
+                           </div>
+                        </div>
+                        <span className="text-xs text-gray-400 font-mono">{sym.quote_currency}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="p-4 text-center text-gray-400 text-sm">
+                    未找到相关币种
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
-          <div>
+          {/* Custom Strategy Logic Dropdown (Combobox) */}
+          <div ref={strategyDropdownRef} className="relative z-10">
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">策略逻辑</label>
-            <select 
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white focus:border-trade-accent outline-none transition-colors"
-              value={config.strategy}
-              onChange={(e) => handleChange('strategy', e.target.value)}
+            
+            <div 
+              onClick={() => setIsStrategyDropdownOpen(!isStrategyDropdownOpen)}
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white cursor-pointer flex justify-between items-center focus:border-trade-accent hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
             >
-              {availableStrategies.map(s => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))}
-            </select>
-            <p className="text-[10px] text-gray-400 mt-1 pl-1 truncate">
-              {availableStrategies.find(s => s.name === config.strategy)?.description}
+               <span className="font-medium text-sm truncate">
+                 {config.strategy || "选择策略..."}
+               </span>
+               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-4 h-4 text-gray-400 transition-transform ${isStrategyDropdownOpen ? 'rotate-180' : ''}`}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </div>
+            
+            <p className="text-[10px] text-gray-400 mt-1 pl-1 truncate h-4">
+              {currentStrategyDesc}
             </p>
+
+            {isStrategyDropdownOpen && (
+              <div className="absolute top-12 left-0 w-full mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 max-h-60 overflow-y-auto custom-scrollbar animate-fade-in">
+                <ul>
+                  {availableStrategies.map(s => (
+                    <li 
+                      key={s.id}
+                      onClick={() => selectStrategy(s.name)}
+                      className={`px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-50 dark:border-gray-700/50 last:border-0 group ${config.strategy === s.name ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                    >
+                        <div className="flex justify-between items-start">
+                           <p className={`font-bold text-sm mb-0.5 ${config.strategy === s.name ? 'text-trade-accent' : 'text-gray-900 dark:text-white'}`}>
+                             {s.name}
+                           </p>
+                           {config.strategy === s.name && <span className="text-trade-accent text-xs">✓</span>}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">{s.description}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
-           <div>
+           <div className="relative z-0">
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">时间级别</label>
              <div className="flex bg-gray-50 dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700">
                {['5m', '15m', '1h', '4h', '1d'].map(tf => (
