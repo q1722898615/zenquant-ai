@@ -138,9 +138,8 @@ export const App: React.FC = () => {
     setIsSwiping(false);
     touchStartX.current = null;
 
-    // Threshold to close: 40% (2/5) of screen width
-    // Updated from 0.35 to 0.4 as requested
-    if (swipeX > screenWidth * 0.4) {
+    // Threshold to close: 30% of screen width (Reduced from 40% for easier navigation)
+    if (swipeX > screenWidth * 0.3) {
       // Animate out
       setSwipeX(screenWidth); 
       // Delay state change to match animation
@@ -374,10 +373,11 @@ export const App: React.FC = () => {
         >
           {/* FIX 2: Back Button is now a SIBLING to the scroll container.
               It is absolutely positioned relative to the FIXED detail container.
-              This means it stays fixed on screen, even when the inner content scrolls.
+              Added e.stopPropagation() to onTouchStart to prevent swipe logic from hijacking the click.
               Moved top-4 (higher). */}
           <button 
             onClick={() => setStep(AppStep.HOME)}
+            onTouchStart={(e) => e.stopPropagation()}
             className="absolute top-4 left-4 z-[60] p-2.5 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md rounded-full shadow-lg border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:scale-105 active:scale-95 transition-all"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
