@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState } from 'react';
 import { TradeConfig, MarketState, AnalysisResult, AnalysisRecord } from '../types';
 import { fetchMarketAnalysis } from '../services/marketService';
-import { analyzeTrade } from '../services/geminiService';
+import { analyzeTrade } from '../services/analysisService';
 import { AnalysisView } from './AnalysisView';
 
 interface Props {
@@ -13,25 +14,29 @@ export const Dashboard: React.FC<Props> = ({ config, onComplete }) => {
   const [marketState, setMarketState] = useState<MarketState | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [loadingStep, setLoadingStep] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   useEffect(() => {
     const runAnalysis = async () => {
       try {
-        setLoadingStep('正在从交易所获取 K线数据...');
-        const market = await fetchMarketAnalysis(config.symbol);
+        setErrorMsg('');
+        setLoadingStep(`正在从交易所获取 ${config.symbol} 实时数据...`);
+        const market = await fetchMarketAnalysis(config.symbol, config.timeframe);
         setMarketState(market);
 
-        setLoadingStep('正在计算 MACD, RSI, EMA, MA...');
-        await new Promise(resolve => setTimeout(resolve, 600));
+        setLoadingStep('后端正在计算技术指标 (MACD, RSI, EMA)...');
+        // 人为延迟一点点，让用户感知到步骤，否则太快了
+        await new Promise(resolve => setTimeout(resolve, 300));
 
-        setLoadingStep('AI 正在基于双指标复合策略进行验算...');
+        setLoadingStep(`AI 正在基于 [${config.strategy}] 策略进行验算...`);
         const aiResult = await analyzeTrade(config, market);
         
         setAnalysis(aiResult);
         setLoadingStep('');
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
-        setLoadingStep('错误');
+        setErrorMsg(e.message || '连接服务器失败');
+        setLoadingStep('');
       }
     };
 
@@ -40,6 +45,10 @@ export const Dashboard: React.FC<Props> = ({ config, onComplete }) => {
 
   const handleFinish = () => {
     if (marketState && analysis) {
+      // 在后端架构下，记录的保存通常在 POST /analysis/evaluate 时已经由后端处理，或者单独调用 save 接口
+      // 这里为了兼容现有 App.tsx 的 state 更新逻辑，我们构造一个 record 返回给父组件
+      // 注意：真正的 ID 应该是后端的，这里仅用于前端 UI 乐观更新，
+      // 实际刷新页面后会从 GET /analysis/records 重新拉取
       const record: AnalysisRecord = {
         id: crypto.randomUUID(),
         timestamp: Date.now(),
@@ -63,18 +72,32 @@ export const Dashboard: React.FC<Props> = ({ config, onComplete }) => {
         <div className="text-center space-y-2">
           <p className="text-xl font-bold text-gray-900 dark:text-white animate-pulse">{loadingStep}</p>
           <div className="flex gap-2 justify-center text-xs text-gray-500 font-mono mt-4">
-             <span className={loadingStep.includes('获取') ? "text-blue-600 dark:text-blue-400 font-bold" : ""}>1. DATA</span>
+             <span className={loadingStep.includes('交易所') ? "text-blue-600 dark:text-blue-400 font-bold" : ""}>1. DATA</span>
              <span>→</span>
-             <span className={loadingStep.includes('计算') ? "text-blue-600 dark:text-blue-400 font-bold" : ""}>2. CALC</span>
-             <span>→</span>
-             <span className={loadingStep.includes('AI') ? "text-blue-600 dark:text-blue-400 font-bold" : ""}>3. DECISION</span>
+             <span className={loadingStep.includes('AI') ? "text-blue-600 dark:text-blue-400 font-bold" : ""}>2. AI AGENT</span>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!analysis || !marketState) return <div className="text-red-500 text-center p-10">系统错误，请刷新重试。</div>;
+  if (errorMsg) return (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] text-red-500 p-10 space-y-4">
+      <div className="text-4xl">⚠️</div>
+      <div className="text-center">
+        <p className="font-bold">分析失败</p>
+        <p className="text-sm mt-2">{errorMsg}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-gray-200 dark:bg-gray-800 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-300"
+        >
+          刷新重试
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!analysis || !marketState) return null;
 
   return (
     <AnalysisView 

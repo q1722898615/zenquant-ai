@@ -1,14 +1,23 @@
+
 export enum TradeSide {
   LONG = 'LONG',
   SHORT = 'SHORT'
 }
 
-export enum StrategyType {
-  TREND_FOLLOWING = '趋势跟踪 (均线/MA)',
-  MEAN_REVERSION = '均值回归 (RSI/布林带)',
-  BREAKOUT = '突破策略 (Breakout)',
-  VEGAS_TUNNEL = 'Vegas 隧道交易法',
-  MACD_RSI_COMPOSITE = 'MACD-RSI 双指标复合策略'
+// 对应后端 Strategy 模型
+export interface Strategy {
+  id: number;
+  name: string;
+  description: string;
+  strategy_type: "BUILTIN" | "CUSTOM";
+  config: any;
+}
+
+export interface SymbolData {
+  id: string;
+  symbol: string;
+  base_currency: string;
+  quote_currency: string;
 }
 
 export enum AppStep {
@@ -19,6 +28,13 @@ export enum AppStep {
   HISTORY_DETAIL = 'HISTORY_DETAIL'
 }
 
+export interface MACDState {
+  line: number;
+  signal: number;
+  histogram: number;
+  crossStatus: 'UP' | 'DOWN' | 'NONE';
+}
+
 export interface MarketState {
   symbol: string;
   currentPrice: number;
@@ -27,12 +43,7 @@ export interface MarketState {
   ma200: number;
   ema12: number;
   ema200: number;
-  macd: {
-    line: number;
-    signal: number;
-    histogram: number;
-    crossStatus: 'UP' | 'DOWN' | 'NONE';
-  };
+  macd: MACDState;
   volatility: number;
 }
 
@@ -46,7 +57,7 @@ export interface TradeConfig {
   accountBalance: number;
   riskPercentage: number;
   leverage: number;
-  strategy: StrategyType;
+  strategy: string; // 后端只接收策略名称或ID字符串
 }
 
 export interface AnalysisResult {
@@ -55,12 +66,26 @@ export interface AnalysisResult {
   reasoning: string;
   riskAssessment: string;
   suggestedAdjustments?: string;
+  strategyScore?: number;
+  rulePassed?: boolean;
 }
 
 export interface AnalysisRecord {
   id: string;
-  timestamp: number;
+  timestamp: number; // 前端统一使用毫秒时间戳，Service层需将后端 ISO 转换
   config: TradeConfig;
   market: MarketState;
   analysis: AnalysisResult;
+}
+
+// API 通用响应接口
+export interface ApiResponse<T = any> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+export interface ListResponse<T> {
+  total: number;
+  items: T[]; 
 }

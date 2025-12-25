@@ -5,14 +5,24 @@ import { Dashboard } from './components/Dashboard';
 import { AnalysisView } from './components/AnalysisView';
 import { ModalDrawer } from './components/ModalDrawer';
 import { AppStep, TradeConfig, AnalysisRecord, TradeSide } from './types';
+import { fetchAnalysisHistory } from './services/analysisService';
 
-const App: React.FC = () => {
+export const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.HOME);
   const [tradeConfig, setTradeConfig] = useState<TradeConfig | null>(null);
   const [history, setHistory] = useState<AnalysisRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<AnalysisRecord | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Load History from Backend
+  useEffect(() => {
+    const loadHistory = async () => {
+      const records = await fetchAnalysisHistory(20);
+      setHistory(records);
+    };
+    loadHistory();
+  }, []);
 
   // Apply theme class to body/html AND update iOS status bar color
   useEffect(() => {
@@ -44,6 +54,7 @@ const App: React.FC = () => {
   };
 
   const handleAnalysisComplete = (record: AnalysisRecord) => {
+    // Add new record to top of list immediately for UI responsiveness
     setHistory(prev => [record, ...prev]);
     setStep(AppStep.HOME);
     setTradeConfig(null);
@@ -302,5 +313,3 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-export default App;

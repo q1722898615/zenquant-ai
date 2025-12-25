@@ -1,6 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
-import { TradeConfig, TradeSide, StrategyType } from '../types';
+import { TradeConfig, TradeSide, Strategy, SymbolData } from '../types';
 import { calculatePositionSize } from '../utils/calculations';
+import { fetchStrategies } from '../services/strategyService';
+import { fetchPopularSymbols } from '../services/marketService';
 
 interface Props {
   onNext: (config: TradeConfig) => void;
@@ -8,6 +11,12 @@ interface Props {
 }
 
 export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
+  // Data State
+  const [availableStrategies, setAvailableStrategies] = useState<Strategy[]>([]);
+  const [popularSymbols, setPopularSymbols] = useState<SymbolData[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // Form State
   const [config, setConfig] = useState<TradeConfig>({
     symbol: 'BTC',
     side: TradeSide.LONG,
@@ -18,10 +27,34 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
     accountBalance: 10000,
     riskPercentage: 1,
     leverage: 1,
-    strategy: StrategyType.TREND_FOLLOWING
+    strategy: '' // Initial empty
   });
 
   const [positionSize, setPositionSize] = useState<{ quantity: number, notional: number, margin: number } | null>(null);
+
+  // Load backend data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [strategies, symbols] = await Promise.all([
+          fetchStrategies(),
+          fetchPopularSymbols()
+        ]);
+        setAvailableStrategies(strategies);
+        setPopularSymbols(symbols);
+        
+        // Set default strategy if available
+        if (strategies.length > 0) {
+          handleChange('strategy', strategies[0].name);
+        }
+      } catch (error) {
+        console.error("Failed to load initial data", error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    loadData();
+  }, []);
 
   useEffect(() => {
     // Auto-calculate position size based on risk
@@ -39,7 +72,16 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  const isFormValid = config.entryPrice > 0 && config.stopLoss > 0 && config.takeProfit > 0;
+  const handleSymbolChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase();
+    handleChange('symbol', val);
+  };
+
+  const isFormValid = config.entryPrice > 0 && config.stopLoss > 0 && config.takeProfit > 0 && config.symbol.length > 0 && config.strategy.length > 0;
+
+  if (isLoadingData) {
+    return <div className="p-10 text-center text-gray-500 animate-pulse">正在连接量化引擎...</div>;
+  }
 
   return (
     <div className="animate-fade-in-up">
@@ -63,16 +105,25 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
         {/* Left Column: Asset & Strategy */}
         <div className="space-y-4">
           <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">交易标的</label>
-            <select 
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white focus:border-trade-accent outline-none transition-colors"
-              value={config.symbol}
-              onChange={(e) => handleChange('symbol', e.target.value)}
-            >
-              <option value="BTC">BTC / USDT</option>
-              <option value="ETH">ETH / USDT</option>
-              <option value="SOL">SOL / USDT</option>
-            </select>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">交易标的 (Symbol)</label>
+            <div className="relative">
+              <input
+                type="text"
+                list="symbol-suggestions"
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white font-bold focus:border-trade-accent outline-none transition-colors uppercase"
+                value={config.symbol}
+                onChange={handleSymbolChange}
+                placeholder="例如: BTC, ETH..."
+              />
+              <datalist id="symbol-suggestions">
+                {popularSymbols.map(sym => (
+                  <option key={sym.id} value={sym.base_currency} />
+                ))}
+              </datalist>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                USDT
+              </div>
+            </div>
           </div>
           
           <div>
@@ -82,16 +133,19 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
               value={config.strategy}
               onChange={(e) => handleChange('strategy', e.target.value)}
             >
-              {Object.values(StrategyType).map(s => (
-                <option key={s} value={s}>{s}</option>
+              {availableStrategies.map(s => (
+                <option key={s.id} value={s.name}>{s.name}</option>
               ))}
             </select>
+            <p className="text-[10px] text-gray-400 mt-1 pl-1 truncate">
+              {availableStrategies.find(s => s.name === config.strategy)?.description}
+            </p>
           </div>
 
            <div>
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">时间级别</label>
              <div className="flex bg-gray-50 dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700">
-               {['5m', '15m', '1h', '4h', 'D'].map(tf => (
+               {['5m', '15m', '1h', '4h', '1d'].map(tf => (
                  <button
                    key={tf}
                    onClick={() => handleChange('timeframe', tf)}
@@ -216,13 +270,6 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
       </div>
 
       <div className="mt-8 flex gap-3">
-        {/* Only show Back button if logic dictates (handled by parent mostly) but kept here for fallback */}
-        {/* <button 
-          onClick={onBack}
-          className="px-6 py-3 rounded-xl border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-        >
-          返回
-        </button> */}
         <button 
           onClick={() => onNext(config)}
           disabled={!isFormValid}
