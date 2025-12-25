@@ -60,11 +60,23 @@ export const App: React.FC = () => {
     setStep(AppStep.AI_ANALYSIS); // Transition to full screen analysis
   };
 
-  const handleAnalysisComplete = (record: AnalysisRecord) => {
-    // Add new record to top of list immediately for UI responsiveness
-    setHistory(prev => [record, ...prev]);
+  const handleAnalysisComplete = async () => {
+    // Transition to Home immediately
     setStep(AppStep.HOME);
     setTradeConfig(null);
+
+    // REFETCH Source of Truth from Backend
+    // This ensures the list view exactly matches what is stored in the DB,
+    // fixing any discrepancies between the "temporary analysis result" and the "saved record".
+    setIsLoadingHistory(true);
+    try {
+      const records = await fetchAnalysisHistory(20);
+      setHistory(records);
+    } catch (error) {
+      console.error("Failed to refresh history", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
   };
 
   const handleViewHistory = (record: AnalysisRecord) => {
@@ -255,7 +267,8 @@ export const App: React.FC = () => {
             <PsychologyCheck onComplete={handlePsychCheckComplete} />
           )}
 
-          {step === AppStep.TRADE_SETUP && (
+          {/* FIX: Include AI_ANALYSIS step here so TradeForm stays rendered while drawer animates out */}
+          {(step === AppStep.TRADE_SETUP || step === AppStep.AI_ANALYSIS) && (
             <TradeForm 
               onNext={handleTradeConfigSubmit} 
               onBack={() => setStep(AppStep.PSYCHOLOGY_CHECK)}

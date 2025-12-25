@@ -15,13 +15,7 @@ interface BackendAnalysisRecord {
   confidence: number;
   trade_config: TradeConfig;
   market_state: any; 
-  analysis_result: {
-    recommendation: 'EXECUTE' | 'WAIT' | 'CANCEL';
-    confidenceScore: number;
-    reasoning: string;
-    riskAssessment: string;
-    suggestedAdjustments?: string | Record<string, string>;
-  };
+  analysis_result: any; // Use any to safely handle mixed casing from backend
   created_at: string;
 }
 
@@ -35,16 +29,34 @@ const formatAdjustments = (adj: string | Record<string, string> | undefined): st
     .join('\n');
 };
 
-// Map backend record to frontend structure
+// Map backend record to frontend structure with robust casing checks
 const mapBackendRecordToFrontend = (record: BackendAnalysisRecord): AnalysisRecord => {
+  const ar = record.analysis_result || {};
+  
+  // Prioritize values in this order: 
+  // 1. Explicit camelCase (frontend standard)
+  // 2. Explicit snake_case (backend standard)
+  // 3. Fallback/Default
+  
+  // Special handling for recommendation: Check root level first if missing in nested object
+  const recommendation = ar.recommendation || record.recommendation || 'WAIT';
+  
+  const confidenceScore = ar.confidenceScore ?? ar.confidence_score ?? record.final_score ?? 0;
+  const reasoning = ar.reasoning ?? ar.reasoning_text ?? 'No reasoning provided.';
+  const riskAssessment = ar.riskAssessment ?? ar.risk_assessment ?? 'No risk assessment provided.';
+  const suggestedAdjustmentsRaw = ar.suggestedAdjustments ?? ar.suggested_adjustments;
+
   return {
     id: record.id,
     timestamp: new Date(record.created_at).getTime(),
     config: record.trade_config,
     market: normalizeMarketState(record.market_state),
     analysis: {
-      ...record.analysis_result,
-      suggestedAdjustments: formatAdjustments(record.analysis_result.suggestedAdjustments)
+      recommendation: recommendation as 'EXECUTE' | 'WAIT' | 'CANCEL',
+      confidenceScore: confidenceScore,
+      reasoning: reasoning,
+      riskAssessment: riskAssessment,
+      suggestedAdjustments: formatAdjustments(suggestedAdjustmentsRaw)
     }
   };
 };
