@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 
 interface Props {
@@ -10,16 +11,37 @@ interface Props {
 export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children }) => {
   const [visible, setVisible] = useState(false);
 
+  // Sync Theme Color with Drawer State
   useEffect(() => {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    
     if (isOpen) {
+      // When drawer is open, set status bar to match drawer background (White or Dark Gray-900)
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', isDarkMode ? '#111827' : '#ffffff');
+      }
+      
       setVisible(true);
-      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      document.body.style.overflow = 'hidden';
     } else {
-      const timer = setTimeout(() => setVisible(false), 300); // Wait for animation
+      // When drawer closes, revert to app background (Gray-50 or Gray-950)
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', isDarkMode ? '#0d1117' : '#f9fafb');
+      }
+
+      const timer = setTimeout(() => setVisible(false), 300);
       document.body.style.overflow = '';
       return () => clearTimeout(timer);
     }
-    return () => { document.body.style.overflow = ''; };
+    
+    return () => { 
+      document.body.style.overflow = ''; 
+      // Safety revert
+      if (metaThemeColor) {
+         metaThemeColor.setAttribute('content', isDarkMode ? '#0d1117' : '#f9fafb');
+      }
+    };
   }, [isOpen]);
 
   if (!visible && !isOpen) return null;
@@ -43,7 +65,7 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
       >
         {/* Mobile Handle Bar */}
         <div className="md:hidden w-full flex justify-center pt-3 pb-1" onClick={onClose}>
-          <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+          <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
         </div>
 
         {/* Header */}
@@ -60,7 +82,7 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="flex-1 overflow-y-auto p-5 md:p-8 custom-scrollbar">
           {children}
         </div>
       </div>

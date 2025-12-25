@@ -26,7 +26,7 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
 
   // Form State
   const [config, setConfig] = useState<TradeConfig>({
-    symbol: 'BTC/USDT', // Default to full pair format
+    symbol: 'BTC/USDT', 
     side: TradeSide.LONG,
     timeframe: '15m',
     entryPrice: 0,
@@ -85,7 +85,6 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
         setDisplaySymbols(popularSymbols);
         return;
       }
-      // If exact match, don't filter out everything else immediately or just keep it
       const exactMatch = popularSymbols.find(s => s.symbol === config.symbol);
       if (exactMatch) return;
 
@@ -144,63 +143,67 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
 
   const currentStrategyDesc = availableStrategies.find(s => s.name === config.strategy)?.description;
 
+  // Define unified styles
+  const LABEL_STYLE = "block text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium tracking-wide";
+  const INPUT_BASE_STYLE = "w-full h-12 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 text-gray-900 dark:text-white font-bold outline-none transition-all flex items-center";
+  const INPUT_FOCUS_STYLE = "focus:border-trade-accent focus:ring-2 focus:ring-trade-accent/10";
+  const DROPDOWN_MENU_STYLE = "absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-gray-800 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] dark:shadow-none border border-gray-100 dark:border-gray-700 max-h-60 overflow-y-auto custom-scrollbar animate-fade-in z-50";
+
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-8">
       {/* Direction Toggle */}
-      <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl mb-6">
+      <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl mb-8">
         <button 
           onClick={() => handleChange('side', TradeSide.LONG)}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${config.side === TradeSide.LONG ? 'bg-white dark:bg-gray-700 text-trade-long shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${config.side === TradeSide.LONG ? 'bg-white dark:bg-gray-700 text-trade-long shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
         >
-          做多 (LONG)
+          <span>🚀</span> 做多 (LONG)
         </button>
         <button 
           onClick={() => handleChange('side', TradeSide.SHORT)}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${config.side === TradeSide.SHORT ? 'bg-white dark:bg-gray-700 text-trade-short shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${config.side === TradeSide.SHORT ? 'bg-white dark:bg-gray-700 text-trade-short shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
         >
-          做空 (SHORT)
+          <span>📉</span> 做空 (SHORT)
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
         {/* Left Column: Asset & Strategy */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           
-          {/* Custom Symbol Search Dropdown */}
-          <div ref={symbolDropdownRef} className="relative z-20">
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">交易标的 (Symbol)</label>
+          {/* Symbol Input */}
+          <div ref={symbolDropdownRef} className="relative z-30">
+            <label className={LABEL_STYLE}>交易标的 (Symbol)</label>
             <div className="relative">
               <input
                 type="text"
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white font-bold focus:border-trade-accent focus:ring-2 focus:ring-trade-accent/20 outline-none transition-all uppercase"
+                className={`${INPUT_BASE_STYLE} ${INPUT_FOCUS_STYLE} uppercase`}
                 value={config.symbol}
                 onChange={handleSymbolInputChange}
                 onFocus={() => setIsSymbolDropdownOpen(true)}
                 placeholder="BTC/USDT"
               />
-              {/* Removed fixed suffix to allow full pair editing */}
             </div>
 
             {isSymbolDropdownOpen && (
-              <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 max-h-60 overflow-y-auto custom-scrollbar animate-fade-in">
+              <div className={DROPDOWN_MENU_STYLE}>
                 {displaySymbols.length > 0 ? (
                   <ul>
                     {displaySymbols.map((sym) => (
                       <li 
                         key={sym.id}
-                        onClick={() => selectSymbol(sym.symbol)} // Use full symbol (e.g. BTC/USDT)
+                        onClick={() => selectSymbol(sym.symbol)}
                         className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer flex justify-between items-center transition-colors border-b border-gray-50 dark:border-gray-700/50 last:border-0 group"
                       >
                         <div className="flex items-center gap-3">
-                           <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold">
+                           <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold border border-blue-100 dark:border-blue-900/50">
                               {sym.base_currency.substring(0, 1)}
                            </div>
                            <div>
                               <p className="font-bold text-gray-900 dark:text-white text-sm">{sym.base_currency}</p>
-                              <p className="text-[10px] text-gray-400 group-hover:text-gray-500">{sym.symbol}</p>
                            </div>
                         </div>
-                        <span className="text-xs text-gray-400 font-mono">{sym.quote_currency}</span>
+                        <span className="text-xs text-gray-400 font-mono">{sym.symbol}</span>
                       </li>
                     ))}
                   </ul>
@@ -213,28 +216,27 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
             )}
           </div>
           
-          {/* Custom Strategy Logic Dropdown (Combobox) */}
-          <div ref={strategyDropdownRef} className="relative z-10">
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">策略逻辑</label>
-            
+          {/* Strategy Dropdown */}
+          <div ref={strategyDropdownRef} className="relative z-20">
+            <label className={LABEL_STYLE}>策略逻辑</label>
             <div 
               onClick={() => setIsStrategyDropdownOpen(!isStrategyDropdownOpen)}
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white cursor-pointer flex justify-between items-center focus:border-trade-accent hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+              className={`${INPUT_BASE_STYLE} cursor-pointer justify-between hover:border-gray-300 dark:hover:border-gray-600`}
             >
-               <span className="font-medium text-sm truncate">
+               <span className={`text-sm truncate ${!config.strategy ? 'text-gray-400 font-normal' : ''}`}>
                  {config.strategy || "选择策略..."}
                </span>
-               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-4 h-4 text-gray-400 transition-transform ${isStrategyDropdownOpen ? 'rotate-180' : ''}`}>
+               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isStrategyDropdownOpen ? 'rotate-180' : ''}`}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </div>
             
-            <p className="text-[10px] text-gray-400 mt-1 pl-1 truncate h-4">
+            <p className="text-[10px] text-gray-400 mt-1.5 pl-1 truncate h-4">
               {currentStrategyDesc}
             </p>
 
             {isStrategyDropdownOpen && (
-              <div className="absolute top-12 left-0 w-full mt-1 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 max-h-60 overflow-y-auto custom-scrollbar animate-fade-in">
+              <div className={DROPDOWN_MENU_STYLE}>
                 <ul>
                   {availableStrategies.map(s => (
                     <li 
@@ -256,14 +258,14 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
             )}
           </div>
 
-           <div className="relative z-0">
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">时间级别</label>
-             <div className="flex bg-gray-50 dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700">
+           <div className="relative z-10">
+            <label className={LABEL_STYLE}>时间级别</label>
+             <div className="flex bg-gray-50 dark:bg-gray-800 rounded-xl p-1 border border-gray-200 dark:border-gray-700 h-12 items-center">
                {['5m', '15m', '1h', '4h', '1d'].map(tf => (
                  <button
                    key={tf}
                    onClick={() => handleChange('timeframe', tf)}
-                   className={`flex-1 text-xs py-1.5 rounded-md transition-all ${config.timeframe === tf ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm font-bold' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                   className={`flex-1 h-9 rounded-lg text-xs font-bold transition-all ${config.timeframe === tf ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm border border-gray-100 dark:border-gray-600' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                  >
                    {tf}
                  </button>
@@ -273,12 +275,12 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
         </div>
 
         {/* Right Column: Price Levels */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
-             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">入场价格 ($)</label>
+             <label className={LABEL_STYLE}>入场价格 ($)</label>
              <input 
                type="number" 
-               className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white font-mono focus:border-trade-accent outline-none"
+               className={`${INPUT_BASE_STYLE} ${INPUT_FOCUS_STYLE} font-mono`}
                value={config.entryPrice || ''}
                onChange={(e) => handleChange('entryPrice', parseFloat(e.target.value))}
                placeholder="0.00"
@@ -286,12 +288,12 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
           </div>
           <div className="flex gap-4">
             <div className="flex-1">
-               <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">止损价格 ($)</label>
+               <label className={LABEL_STYLE}>止损价格 ($)</label>
                <input 
                  type="number" 
-                 className={`w-full bg-gray-50 dark:bg-gray-800 border rounded-lg p-2.5 text-gray-900 dark:text-white font-mono outline-none ${
-                   config.side === TradeSide.LONG && config.stopLoss >= config.entryPrice && config.entryPrice > 0 ? 'border-red-500 ring-1 ring-red-500' : 
-                   config.side === TradeSide.SHORT && config.stopLoss <= config.entryPrice && config.entryPrice > 0 ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-200 dark:border-gray-700 focus:border-trade-accent'
+                 className={`${INPUT_BASE_STYLE} font-mono ${
+                   config.side === TradeSide.LONG && config.stopLoss >= config.entryPrice && config.entryPrice > 0 ? 'border-red-500 ring-1 ring-red-500/20 bg-red-50/50 dark:bg-red-900/10' : 
+                   config.side === TradeSide.SHORT && config.stopLoss <= config.entryPrice && config.entryPrice > 0 ? 'border-red-500 ring-1 ring-red-500/20 bg-red-50/50 dark:bg-red-900/10' : INPUT_FOCUS_STYLE
                  }`}
                  value={config.stopLoss || ''}
                  onChange={(e) => handleChange('stopLoss', parseFloat(e.target.value))}
@@ -299,10 +301,10 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
                />
             </div>
              <div className="flex-1">
-               <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">止盈价格 ($)</label>
+               <label className={LABEL_STYLE}>止盈价格 ($)</label>
                <input 
                  type="number" 
-                 className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white font-mono focus:border-trade-accent outline-none"
+                 className={`${INPUT_BASE_STYLE} ${INPUT_FOCUS_STYLE} font-mono`}
                  value={config.takeProfit || ''}
                  onChange={(e) => handleChange('takeProfit', parseFloat(e.target.value))}
                  placeholder="Target"
@@ -313,41 +315,41 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
       </div>
 
       {/* Risk Management Section */}
-      <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
-        <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 mb-4 uppercase tracking-wider flex items-center gap-2">
+      <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-800">
+        <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 mb-6 uppercase tracking-wider flex items-center gap-2">
           <span>🛡️</span> 风险管理 & 仓位
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">账户总资金 ($)</label>
+            <label className={LABEL_STYLE}>账户总资金 ($)</label>
             <input 
               type="number" 
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white font-mono focus:border-trade-accent outline-none"
+              className={`${INPUT_BASE_STYLE} ${INPUT_FOCUS_STYLE} font-mono`}
               value={config.accountBalance}
               onChange={(e) => handleChange('accountBalance', parseFloat(e.target.value))}
             />
           </div>
           
           <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">单笔风险 (%)</label>
+            <label className={LABEL_STYLE}>单笔风险 (%)</label>
             <input 
               type="number" 
               step="0.1"
               max="10"
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white font-mono focus:border-trade-accent outline-none"
+              className={`${INPUT_BASE_STYLE} ${INPUT_FOCUS_STYLE} font-mono`}
               value={config.riskPercentage}
               onChange={(e) => handleChange('riskPercentage', parseFloat(e.target.value))}
             />
           </div>
 
           <div>
-             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">杠杆倍数 (x)</label>
+             <label className={LABEL_STYLE}>杠杆倍数 (x)</label>
             <input 
               type="number" 
               step="1"
               max="125"
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-gray-900 dark:text-white font-mono focus:border-trade-accent outline-none"
+              className={`${INPUT_BASE_STYLE} ${INPUT_FOCUS_STYLE} font-mono`}
               value={config.leverage}
               onChange={(e) => handleChange('leverage', parseFloat(e.target.value))}
             />
@@ -355,39 +357,39 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack }) => {
         </div>
 
         {/* Dynamic Position Calculator Display */}
-        <div className="mt-6 bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-4">
+        <div className="mt-8 bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-5 border border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-y-4 gap-x-8">
             <div className="text-left">
-               <p className="text-[10px] text-gray-500 uppercase">预计亏损 (Risk)</p>
-               <p className="text-lg font-mono text-red-500 dark:text-red-400 font-bold">
+               <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">预计亏损 (Risk)</p>
+               <p className="text-xl font-mono text-red-500 dark:text-red-400 font-bold tracking-tight">
                  ${((config.accountBalance * config.riskPercentage) / 100).toFixed(2)}
                </p>
             </div>
             <div className="text-left">
-              <p className="text-[10px] text-gray-500 uppercase">开仓数量 (Coins)</p>
-              <p className="text-lg font-mono text-blue-600 dark:text-blue-400 font-bold">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">开仓数量 (Coins)</p>
+              <p className="text-xl font-mono text-blue-600 dark:text-blue-400 font-bold tracking-tight">
                 {positionSize ? positionSize.quantity.toFixed(4) : '---'}
               </p>
             </div>
             <div className="text-left">
-              <p className="text-[10px] text-gray-500 uppercase">名义价值 (Value)</p>
-              <p className="text-lg font-mono text-gray-700 dark:text-gray-300">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">名义价值 (Value)</p>
+              <p className="text-xl font-mono text-gray-700 dark:text-gray-300 tracking-tight">
                  ${positionSize ? positionSize.notional.toFixed(0) : '---'}
               </p>
             </div>
             <div className="text-left">
-              <p className="text-[10px] text-gray-500 uppercase">保证金 (Margin)</p>
-              <p className="text-lg font-mono text-yellow-600 dark:text-yellow-400 font-bold">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">保证金 (Margin)</p>
+              <p className="text-xl font-mono text-yellow-600 dark:text-yellow-400 font-bold tracking-tight">
                  ${positionSize ? positionSize.margin.toFixed(2) : '---'}
               </p>
             </div>
         </div>
       </div>
 
-      <div className="mt-8 flex gap-3">
+      <div className="mt-8">
         <button 
           onClick={() => onNext(config)}
           disabled={!isFormValid}
-          className={`w-full py-4 rounded-xl font-bold tracking-wide transition shadow-lg ${isFormValid ? 'bg-trade-accent text-white hover:bg-blue-600' : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'}`}
+          className={`w-full h-14 rounded-2xl font-bold text-lg tracking-wide transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 ${isFormValid ? 'bg-trade-accent text-white hover:bg-blue-600' : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'}`}
         >
           开始 AI 智能分析
         </button>
