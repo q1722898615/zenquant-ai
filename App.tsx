@@ -183,7 +183,9 @@ export const App: React.FC = () => {
     inset: 0,
     zIndex: 50,
     backgroundColor: isDarkMode ? '#0A0F17' : '#FFFFFF',
-    boxShadow: '-16px 0 40px -10px rgba(0,0,0,0.5)' 
+    boxShadow: '-16px 0 40px -10px rgba(0,0,0,0.5)',
+    // LOCK VERTICAL SCROLL WHEN SWIPING
+    overflowY: (isSwiping || swipeX > 0) ? 'hidden' : 'auto'
   };
 
   // Helpers
