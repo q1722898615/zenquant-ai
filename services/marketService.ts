@@ -2,25 +2,49 @@
 import { request } from './api';
 import { MarketState, SymbolData } from '../types';
 
-// Helper to handle Python backend snake_case response
+// Helper to handle Python backend snake_case response and calculate missing metrics
 export const normalizeMarketState = (data: any): MarketState => {
   if (!data) {
     throw new Error("Market data is empty");
   }
+
+  // 1. Price Normalization
+  // Backend uses 'close' for current price usually
+  const currentPrice = data.close ?? data.currentPrice ?? data.current_price ?? 0;
+
+  // 2. Indicators Normalization
+  const ema12 = data.ema_12 ?? data.ema12 ?? 0;
+  const ema200 = data.ema_200 ?? data.ema200 ?? 0;
+  // Fallback for MA if not present (using EMAs or price)
+  const ma50 = data.ma_50 ?? data.ma50 ?? currentPrice; 
+  const ma200 = data.ma_200 ?? data.ma200 ?? ema200;
+
+  // 3. MACD Calculation / Normalization
+  // If backend doesn't provide explicit MACD histogram, we try to calculate line manually
+  let macdLine = data.macd?.line ?? data.macd_line ?? 0;
+  if (macdLine === 0 && ema12 !== 0 && data.ema_26) {
+    macdLine = ema12 - data.ema_26;
+  }
+  
+  const macdSignal = data.macd?.signal ?? data.macd_signal ?? 0;
+  const macdHist = data.macd?.histogram ?? data.macd_hist ?? (macdLine - macdSignal);
+  
+  // Cross status from backend or manual calculation
+  let crossStatus = data.macd?.crossStatus ?? data.macd?.cross_status ?? data.ema_12_26_cross ?? 'NONE';
+
   return {
-    symbol: data.symbol,
-    // Support both camelCase (Frontend/Spec) and snake_case (Python default)
-    currentPrice: data.currentPrice ?? data.current_price ?? 0,
-    rsi: data.rsi ?? 0,
-    ma50: data.ma50 ?? data.ma_50 ?? 0,
-    ma200: data.ma200 ?? data.ma_200 ?? 0,
-    ema12: data.ema12 ?? data.ema_12 ?? 0,
-    ema200: data.ema200 ?? data.ema_200 ?? 0,
+    symbol: data.symbol || 'UNKNOWN',
+    currentPrice: currentPrice,
+    rsi: data.rsi ?? 50, // Default to neutral if missing (e.g. backend sent ADX instead)
+    ma50: ma50,
+    ma200: ma200,
+    ema12: ema12,
+    ema200: ema200,
     macd: {
-      line: data.macd?.line ?? 0,
-      signal: data.macd?.signal ?? 0,
-      histogram: data.macd?.histogram ?? 0,
-      crossStatus: data.macd?.crossStatus ?? data.macd?.cross_status ?? 'NONE'
+      line: macdLine,
+      signal: macdSignal,
+      histogram: macdHist,
+      crossStatus: crossStatus
     },
     volatility: data.volatility ?? 0
   };

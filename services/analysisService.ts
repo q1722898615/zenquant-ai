@@ -15,7 +15,13 @@ interface BackendAnalysisRecord {
   confidence: number;
   trade_config: TradeConfig;
   market_state: any; // Raw backend data usually in snake_case
-  analysis_result: AnalysisResult;
+  analysis_result: {
+    recommendation: 'EXECUTE' | 'WAIT' | 'CANCEL';
+    confidenceScore: number;
+    reasoning: string;
+    riskAssessment: string;
+    suggestedAdjustments?: string | Record<string, string>; // Support string or object
+  };
   created_at: string;
 }
 
@@ -91,6 +97,17 @@ const MOCK_HISTORY: AnalysisRecord[] = [
   }
 ];
 
+// Helper to format adjustments if they come as an object
+const formatAdjustments = (adj: string | Record<string, string> | undefined): string | undefined => {
+  if (!adj) return undefined;
+  if (typeof adj === 'string') return adj;
+  
+  // Format object key-values into a readable string
+  return Object.entries(adj)
+    .map(([key, value]) => `• ${key.toUpperCase()}: ${value}`)
+    .join('\n');
+};
+
 // 将后端记录转换为前端使用的格式
 const mapBackendRecordToFrontend = (record: BackendAnalysisRecord): AnalysisRecord => {
   return {
@@ -98,7 +115,10 @@ const mapBackendRecordToFrontend = (record: BackendAnalysisRecord): AnalysisReco
     timestamp: new Date(record.created_at).getTime(),
     config: record.trade_config,
     market: normalizeMarketState(record.market_state),
-    analysis: record.analysis_result
+    analysis: {
+      ...record.analysis_result,
+      suggestedAdjustments: formatAdjustments(record.analysis_result.suggestedAdjustments)
+    }
   };
 };
 
@@ -109,15 +129,22 @@ export const analyzeTrade = async (
   console.log("[AnalysisService] Requesting AI evaluation...");
   
   try {
-    return await request<AnalysisResult>('/analysis/evaluate', {
+    const response = await request<AnalysisResult>('/analysis/evaluate', {
       method: 'POST',
       body: JSON.stringify({
         config: trade,
         market_state: market
       })
     });
+
+    // Handle suggestedAdjustments if it returns as object here too
+    if (response.suggestedAdjustments && typeof response.suggestedAdjustments === 'object') {
+       response.suggestedAdjustments = formatAdjustments(response.suggestedAdjustments as any);
+    }
+    return response;
+
   } catch (error) {
-    console.warn("AI Analysis Failed (Backend Unreachable): Using Mock Result");
+    console.warn("AI Analysis Failed (Backend Unreachable): Using Mock Result", error);
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 2000));
     
