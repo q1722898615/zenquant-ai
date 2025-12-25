@@ -85,9 +85,6 @@ export const App: React.FC = () => {
 
   // Called silently by Dashboard when analysis is ready, just to save the record
   const handleAnalysisComplete = async (newRecord: AnalysisRecord) => {
-    // We do NOT change step to HOME here automatically. 
-    // The user is viewing the analysis.
-    // We just refresh the history list in background.
     try {
       const records = await fetchAnalysisHistory(20);
       setHistory(records);
@@ -114,8 +111,8 @@ export const App: React.FC = () => {
     if (!isDetailViewOpen) return;
 
     const startX = e.touches[0].clientX;
-    // Only trigger if starting from the left edge (Left 40px)
-    if (startX < 40) {
+    // Increased sensitivity threshold from 40px to 70px
+    if (startX < 70) {
       touchStartX.current = startX;
       setIsSwiping(true);
     } else {
@@ -141,8 +138,8 @@ export const App: React.FC = () => {
     setIsSwiping(false);
     touchStartX.current = null;
 
-    // Threshold to close: 40% of screen width
-    if (swipeX > screenWidth * 0.4) {
+    // Threshold to close: 35% of screen width (more sensitive)
+    if (swipeX > screenWidth * 0.35) {
       // Animate out
       setSwipeX(screenWidth); 
       // Delay state change to match animation
@@ -158,14 +155,12 @@ export const App: React.FC = () => {
 
   // --- Animation Styles Calculation ---
   
-  // 1. Home View Styles (Background)
-  // When SwipeX is 0 (Detail Open), Home is Scale 0.92, Brightness 0.8
-  // When SwipeX is Max (Detail Closed), Home is Scale 1.0, Brightness 1.0
   const progress = Math.min(Math.max(swipeX / screenWidth, 0), 1);
   const homeScale = 0.92 + (0.08 * progress); // 0.92 -> 1.0
   const homeOpacity = isDetailViewOpen ? (0.5 + (0.5 * progress)) : 1;
   const homeBorderRadius = isDetailViewOpen && progress < 1 ? '16px' : '0px';
 
+  // 1. Home View Styles (Background Layer)
   const homeStyle: React.CSSProperties = {
     transform: `scale(${isDetailViewOpen ? homeScale : 1})`,
     opacity: homeOpacity,
@@ -173,7 +168,7 @@ export const App: React.FC = () => {
     filter: isDetailViewOpen ? `brightness(${0.8 + 0.2 * progress})` : 'none',
     transition: isSwiping ? 'none' : 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.4s, filter 0.4s, border-radius 0.4s',
     overflow: 'hidden',
-    height: '100vh',
+    height: '100dvh', // Use dynamic viewport height for mobile browsers
     width: '100vw',
     position: 'absolute',
     top: 0,
@@ -182,10 +177,10 @@ export const App: React.FC = () => {
     backgroundColor: isDarkMode ? '#101624' : '#FEFEFE' 
   };
 
-  // 2. Detail View Styles (Foreground)
+  // 2. Detail View Styles (Foreground Layer)
   const detailStyle: React.CSSProperties = {
     transform: `translateX(${swipeX}px)`,
-    transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+    transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.15, 0.85, 0.15, 1)', // Smoother iOS-like curve
     position: 'fixed',
     top: 0,
     left: 0,
@@ -193,7 +188,8 @@ export const App: React.FC = () => {
     bottom: 0,
     zIndex: 50,
     backgroundColor: isDarkMode ? '#0A0F17' : '#FFFFFF',
-    boxShadow: '-10px 0 40px rgba(0,0,0,0.2)'
+    // Strong shadow to separate layers (Like Figure 2)
+    boxShadow: '-16px 0 40px -10px rgba(0,0,0,0.5)' 
   };
 
   // Helpers
@@ -213,14 +209,16 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans overflow-hidden bg-black`}>
+    <div className={`min-h-[100dvh] font-sans overflow-hidden bg-black`}>
       
       {/* --- LAYER 1: HOME VIEW (SCALES IN BACKGROUND) --- */}
-      <div style={homeStyle}>
-        <div className={`h-full overflow-y-auto ${isDetailViewOpen ? 'pointer-events-none' : ''}`}>
-          
-          {/* Mobile Header (Home) */}
-          <nav className="md:hidden sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3">
+      <div style={homeStyle} className="flex flex-col">
+        
+        {/* === Header (FIXED at Top of Home Layer) === */}
+        {/* We place it here so it scales WITH the home view but stays top of content */}
+        <div className="flex-none absolute top-0 left-0 right-0 z-40">
+           {/* Mobile Header */}
+          <nav className="md:hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3">
             <div className="flex items-center gap-3">
               <button className="text-gray-600 dark:text-gray-300">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -250,8 +248,8 @@ export const App: React.FC = () => {
             </div>
           </nav>
 
-          {/* Desktop Header (Home) */}
-          <nav className="hidden md:block border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/50 backdrop-blur-md sticky top-0 z-40">
+          {/* Desktop Header */}
+          <nav className="hidden md:block border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/50 backdrop-blur-md">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center justify-between h-16">
                 <div 
@@ -269,9 +267,12 @@ export const App: React.FC = () => {
               </div>
             </div>
           </nav>
+        </div>
 
-          {/* Home Content */}
-          <main className="py-6 px-4 sm:px-6 lg:px-8 pb-32">
+        {/* === Scrollable Content (Middle) === */}
+        {/* Added padding top (pt-16) to account for absolute header, and padding bottom (pb-24) for floating bar */}
+        <div className={`flex-1 overflow-y-auto pt-16 pb-24 ${isDetailViewOpen ? 'pointer-events-none' : ''}`}>
+          <main className="py-6 px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto animate-fade-in">
               {isLoadingHistory ? (
                 <div className="flex flex-col items-center justify-center min-h-[300px] text-gray-400">
@@ -325,7 +326,8 @@ export const App: React.FC = () => {
           </main>
         </div>
 
-        {/* Floating Action Bar (Bottom Capsule) - Attached to Home View */}
+        {/* === Floating Action Bar (FIXED at Bottom of Home Layer) === */}
+        {/* Positioned absolutely within the 100dvh container so it doesn't scroll with content */}
         <div className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 z-40 transition-opacity duration-300 ${isDetailViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full px-2 py-2 flex items-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-100 dark:border-gray-700">
             <button className="w-12 h-12 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
