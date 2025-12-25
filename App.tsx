@@ -30,6 +30,7 @@ export const App: React.FC = () => {
   const [isClosing, setIsClosing] = useState(false);
   const [swipeX, setSwipeX] = useState(0); // Current X translation in pixels
   const touchStartX = useRef<number | null>(null);
+  const touchStartTime = useRef<number>(0); // Timer for velocity calculation
   const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 375;
   const isDetailViewOpen = step === AppStep.HISTORY_DETAIL || step === AppStep.AI_ANALYSIS;
 
@@ -118,6 +119,7 @@ export const App: React.FC = () => {
     // Sensitivity threshold: 70px from left edge
     if (startX < 70) {
       touchStartX.current = startX;
+      touchStartTime.current = Date.now(); // Start timer
       setIsSwiping(true);
     } else {
       touchStartX.current = null;
@@ -140,10 +142,21 @@ export const App: React.FC = () => {
     if (!isSwiping) return;
 
     setIsSwiping(false);
+    
+    // Calculate velocity
+    const touchEndTime = Date.now();
+    const timeDiff = touchEndTime - touchStartTime.current;
+    const velocity = swipeX / Math.max(timeDiff, 1); // px/ms
+
     touchStartX.current = null;
 
-    // Threshold to close: 40% (2/5) of screen width as requested
-    if (swipeX > screenWidth * 0.4) {
+    // Threshold Logic:
+    // 1. Distance > 40% of screen (Standard slow drag threshold)
+    // 2. OR Fast Flick (Velocity > 0.5 px/ms) with minimal movement (>50px)
+    const isDistanceMet = swipeX > screenWidth * 0.4;
+    const isFlick = velocity > 0.5 && swipeX > 50;
+
+    if (isDistanceMet || isFlick) {
       // Start exit sequence
       setIsClosing(true);
       
