@@ -37,12 +37,12 @@ export const App: React.FC = () => {
 
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
-      // Set status bar to gray-950 (#0d1117) for dark mode
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#0d1117');
+      // Set status bar to user defined dark BG (#101624)
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#101624');
     } else {
       document.documentElement.classList.remove('dark');
-      // Set status bar to gray-50 (#f9fafb) for light mode to match app background
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#f9fafb');
+      // Set status bar to user defined light BG (#FEFEFE)
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#FEFEFE');
     }
   }, [isDarkMode]);
 

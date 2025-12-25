@@ -18,20 +18,20 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
     
     if (isOpen) {
       // When drawer is open, dim the status bar to match the backdrop overlay
-      // Light Mode: Gray-500 (#6b7280) to simulate dimmed effect
-      // Dark Mode: Black (#000000) for deeper immersion
+      // Light Mode: #999999 (User picked)
+      // Dark Mode: #0A0F17 (User picked)
       if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', isDarkMode ? '#000000' : '#6b7280');
+        metaThemeColor.setAttribute('content', isDarkMode ? '#0A0F17' : '#999999');
       }
       
       setVisible(true);
       document.body.style.overflow = 'hidden';
     } else {
       // When drawer closes, revert to app background
-      // Light Mode: Gray-50 (#f9fafb)
-      // Dark Mode: Gray-950 (#0d1117)
+      // Light Mode: #FEFEFE (User picked)
+      // Dark Mode: #101624 (User picked)
       if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', isDarkMode ? '#0d1117' : '#f9fafb');
+        metaThemeColor.setAttribute('content', isDarkMode ? '#101624' : '#FEFEFE');
       }
 
       const timer = setTimeout(() => setVisible(false), 300);
@@ -43,7 +43,7 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
       document.body.style.overflow = ''; 
       // Safety revert on unmount
       if (metaThemeColor) {
-         metaThemeColor.setAttribute('content', isDarkMode ? '#0d1117' : '#f9fafb');
+         metaThemeColor.setAttribute('content', isDarkMode ? '#101624' : '#FEFEFE');
       }
     };
   }, [isOpen]);
