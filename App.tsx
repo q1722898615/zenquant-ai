@@ -26,6 +26,8 @@ export const App: React.FC = () => {
 
   // --- Gesture & Animation State ---
   const [isSwiping, setIsSwiping] = useState(false);
+  // New state to track the "exiting" phase of the detail view
+  const [isClosing, setIsClosing] = useState(false);
   const [swipeX, setSwipeX] = useState(0); // Current X translation in pixels
   const touchStartX = useRef<number | null>(null);
   const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 375;
@@ -81,6 +83,7 @@ export const App: React.FC = () => {
     // Reset swipe state when entering new view
     setSwipeX(0);
     setIsSwiping(false);
+    setIsClosing(false);
   };
 
   // Called silently by Dashboard when analysis is ready, just to save the record
@@ -98,6 +101,7 @@ export const App: React.FC = () => {
     setStep(AppStep.HISTORY_DETAIL);
     setSwipeX(0);
     setIsSwiping(false);
+    setIsClosing(false);
   };
 
   const handleCloseDrawer = () => {
@@ -108,7 +112,7 @@ export const App: React.FC = () => {
 
   const onTouchStart = (e: React.TouchEvent) => {
     // Only enable swipe if we are in a detail view
-    if (!isDetailViewOpen) return;
+    if (!isDetailViewOpen || isClosing) return;
 
     const startX = e.touches[0].clientX;
     // Sensitivity threshold: 70px from left edge
@@ -138,15 +142,20 @@ export const App: React.FC = () => {
     setIsSwiping(false);
     touchStartX.current = null;
 
-    // Threshold to close: 30% of screen width (Reduced from 40% for easier navigation)
-    if (swipeX > screenWidth * 0.3) {
-      // Animate out
+    // Threshold to close: 40% (2/5) of screen width as requested
+    if (swipeX > screenWidth * 0.4) {
+      // Start exit sequence
+      setIsClosing(true);
+      
+      // Animate out completely
       setSwipeX(screenWidth); 
-      // Delay state change to match animation
+      
+      // Shortened delay to 200ms for snappier feel
       setTimeout(() => {
         setStep(AppStep.HOME);
-        setSwipeX(0); // Reset for next time
-      }, 300);
+        setSwipeX(0); 
+        setIsClosing(false);
+      }, 200);
     } else {
       // Snap back
       setSwipeX(0);
@@ -157,14 +166,19 @@ export const App: React.FC = () => {
   
   const progress = Math.min(Math.max(swipeX / screenWidth, 0), 1);
   
-  // FIX: Replaced CSS filter with a separate Overlay Div opacity calculation.
-  // This prevents scrolling issues caused by 'filter' layer promotion on mobile.
-  // 30% opacity when fully open (progress=0), 0% when closed (progress=1 or !isDetailViewOpen).
-  const backdropOpacity = isDetailViewOpen ? (1 - progress) * 0.3 : 0;
+  // Opacity for the black overlay
+  const backdropOpacity = isDetailViewOpen && !isClosing ? (1 - progress) * 0.3 : 0;
+
+  // Logic: Show floating bar if we are at HOME OR if we are currently closing the detail view.
+  // This makes the bar appear immediately when the user lets go of the swipe.
+  const showFloatingBar = !isDetailViewOpen || isClosing;
+  
+  // Logic: Allow interaction with Home if HOME OR if Closing.
+  // This prevents the "scroll freeze" by enabling pointer events on Home as soon as the closing animation starts.
+  const isHomeInteractive = !isDetailViewOpen || isClosing;
 
   // 1. Home View Styles (Background Layer)
   const homeStyle: React.CSSProperties = {
-    // FIX: Removed overflow: hidden to prevent iOS scroll locking on child elements
     position: 'absolute',
     inset: 0,
     zIndex: 0,
@@ -174,14 +188,16 @@ export const App: React.FC = () => {
   // 2. Detail View Styles (Foreground Layer)
   const detailStyle: React.CSSProperties = {
     transform: `translateX(${swipeX}px)`,
-    transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.15, 0.85, 0.15, 1)',
+    // Faster transition (0.2s) to match the new timeout
+    transition: isSwiping ? 'none' : 'transform 0.2s cubic-bezier(0.15, 0.85, 0.15, 1)',
     position: 'fixed',
     inset: 0,
     zIndex: 50,
     backgroundColor: isDarkMode ? '#0A0F17' : '#FFFFFF',
     boxShadow: '-16px 0 40px -10px rgba(0,0,0,0.5)',
-    // NOTE: Overflow is handled by the inner container, not this wrapper, 
-    // to allow the back button to stay fixed.
+    // IMPORTANT: Disable pointer events on the detail view when it is animating out (closing),
+    // so touches fall through to the Home view immediately.
+    pointerEvents: isClosing ? 'none' : 'auto'
   };
 
   // Helpers
@@ -266,7 +282,12 @@ export const App: React.FC = () => {
           className="flex-1 overflow-y-auto w-full relative touch-pan-y" 
           style={{ 
             WebkitOverflowScrolling: 'touch', 
-            // FIX: Removed transform: translate3d as it creates a stacking context that can interfere with touch events on iOS when overlay changes
+            // Control pointer events to prevent "scroll freeze". 
+            // If home is interactive (Home or Closing), allow events. Otherwise (Detail Open), block events.
+            pointerEvents: isHomeInteractive ? 'auto' : 'none',
+            // Also hide overflow when disabled to be safe, though pointer-events usually suffices.
+            // Using overflow-y hidden prevents scrolling entirely.
+            overflowY: isHomeInteractive ? 'auto' : 'hidden'
           }}
         >
           {/* Added min-h-[101%] to force scrollability for bounce effect */}
@@ -324,20 +345,19 @@ export const App: React.FC = () => {
           </main>
         </div>
 
-        {/* --- Dimming Overlay (Replaces CSS Filter for better scroll performance) --- */}
+        {/* --- Dimming Overlay --- */}
         <div 
           className="absolute inset-0 bg-black pointer-events-none"
           style={{ 
             opacity: backdropOpacity, 
-            transition: isSwiping ? 'none' : 'opacity 0.4s ease',
+            transition: isSwiping ? 'none' : 'opacity 0.2s ease', // Faster transition
             zIndex: 20,
-            // FIX: Explicitly hide the overlay when not in use to ensure it doesn't block interactions
-            visibility: isDetailViewOpen ? 'visible' : 'hidden'
+            visibility: (isDetailViewOpen && !isClosing) ? 'visible' : 'hidden'
           }}
         />
 
         {/* === Floating Action Bar === */}
-        <div className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 z-40 transition-opacity duration-300 ${isDetailViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <div className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 z-40 transition-opacity duration-200 ${showFloatingBar ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full px-2 py-2 flex items-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-100 dark:border-gray-700">
             <button className="w-12 h-12 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -371,10 +391,7 @@ export const App: React.FC = () => {
           onTouchEnd={onTouchEnd}
           className="bg-white dark:bg-gray-900" // Ensure background is set
         >
-          {/* FIX 2: Back Button is now a SIBLING to the scroll container.
-              It is absolutely positioned relative to the FIXED detail container.
-              Added e.stopPropagation() to onTouchStart to prevent swipe logic from hijacking the click.
-              Moved top-4 (higher). */}
+          {/* FIX 2: Back Button is now a SIBLING to the scroll container. */}
           <button 
             onClick={() => setStep(AppStep.HOME)}
             onTouchStart={(e) => e.stopPropagation()}
