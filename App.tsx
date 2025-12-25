@@ -138,8 +138,9 @@ export const App: React.FC = () => {
     setIsSwiping(false);
     touchStartX.current = null;
 
-    // Threshold to close: 35% of screen width
-    if (swipeX > screenWidth * 0.35) {
+    // Threshold to close: 40% (2/5) of screen width
+    // Updated from 0.35 to 0.4 as requested
+    if (swipeX > screenWidth * 0.4) {
       // Animate out
       setSwipeX(screenWidth); 
       // Delay state change to match animation
@@ -156,12 +157,16 @@ export const App: React.FC = () => {
   // --- Animation Styles Calculation ---
   
   const progress = Math.min(Math.max(swipeX / screenWidth, 0), 1);
-  const homeFilter = isDetailViewOpen ? `brightness(${0.7 + 0.3 * progress})` : 'none';
+  
+  // FIX: Replaced CSS filter with a separate Overlay Div opacity calculation.
+  // This prevents scrolling issues caused by 'filter' layer promotion on mobile.
+  // 30% opacity when fully open (progress=0), 0% when closed (progress=1 or !isDetailViewOpen).
+  const backdropOpacity = isDetailViewOpen ? (1 - progress) * 0.3 : 0;
 
   // 1. Home View Styles (Background Layer)
   const homeStyle: React.CSSProperties = {
-    filter: homeFilter,
-    transition: isSwiping ? 'none' : 'filter 0.4s ease',
+    // REMOVED: filter: homeFilter, 
+    // REMOVED: transition: isSwiping ? 'none' : 'filter 0.4s ease',
     overflow: 'hidden',
     position: 'absolute',
     inset: 0,
@@ -260,11 +265,12 @@ export const App: React.FC = () => {
         </div>
 
         {/* === Scrollable Content (Flex 1) === */}
-        {/* FIX 1: Removed overscroll-y-contain to allow natural bounce even when empty */}
-        {/* FIX 2: Removed conditional pointer-events-none (was causing stuck scrolling). Added touch-pan-y and WebkitOverflowScrolling for mobile smoothness. */}
         <div 
           className="flex-1 overflow-y-auto w-full relative touch-pan-y" 
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          style={{ 
+            WebkitOverflowScrolling: 'touch', 
+            transform: 'translate3d(0,0,0)' // Hardware acceleration for smoother scroll isolation
+          }}
         >
           {/* Added min-h-[101%] to force scrollability for bounce effect */}
           <main className="py-6 px-4 sm:px-6 lg:px-8 pb-32 min-h-[101%]">
@@ -320,6 +326,16 @@ export const App: React.FC = () => {
             </div>
           </main>
         </div>
+
+        {/* --- Dimming Overlay (Replaces CSS Filter for better scroll performance) --- */}
+        <div 
+          className="absolute inset-0 bg-black pointer-events-none"
+          style={{ 
+            opacity: backdropOpacity, 
+            transition: isSwiping ? 'none' : 'opacity 0.4s ease',
+            zIndex: 20 
+          }}
+        />
 
         {/* === Floating Action Bar === */}
         <div className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 z-40 transition-opacity duration-300 ${isDetailViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
