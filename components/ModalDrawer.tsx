@@ -17,15 +17,19 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
     const isDarkMode = document.documentElement.classList.contains('dark');
     
     if (isOpen) {
-      // When drawer is open, set status bar to match drawer background (White or Dark Gray-900)
+      // When drawer is open, dim the status bar to match the backdrop overlay
+      // Light Mode: Gray-500 (#6b7280) to simulate dimmed effect
+      // Dark Mode: Black (#000000) for deeper immersion
       if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', isDarkMode ? '#111827' : '#ffffff');
+        metaThemeColor.setAttribute('content', isDarkMode ? '#000000' : '#6b7280');
       }
       
       setVisible(true);
       document.body.style.overflow = 'hidden';
     } else {
-      // When drawer closes, revert to app background (Gray-50 or Gray-950)
+      // When drawer closes, revert to app background
+      // Light Mode: Gray-50 (#f9fafb)
+      // Dark Mode: Gray-950 (#0d1117)
       if (metaThemeColor) {
         metaThemeColor.setAttribute('content', isDarkMode ? '#0d1117' : '#f9fafb');
       }
@@ -37,7 +41,7 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
     
     return () => { 
       document.body.style.overflow = ''; 
-      // Safety revert
+      // Safety revert on unmount
       if (metaThemeColor) {
          metaThemeColor.setAttribute('content', isDarkMode ? '#0d1117' : '#f9fafb');
       }
