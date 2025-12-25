@@ -156,21 +156,15 @@ export const App: React.FC = () => {
   // --- Animation Styles Calculation ---
   
   const progress = Math.min(Math.max(swipeX / screenWidth, 0), 1);
-  
-  // REFACTOR: Removed scaling. 
-  // Just use brightness filter for depth.
-  // When progress = 0 (Detail fully open), brightness = 0.7
-  // When progress = 1 (Detail fully closed/swiped away), brightness = 1
   const homeFilter = isDetailViewOpen ? `brightness(${0.7 + 0.3 * progress})` : 'none';
 
   // 1. Home View Styles (Background Layer)
   const homeStyle: React.CSSProperties = {
-    // transform: 'scale(1)', // Explicitly no scale
     filter: homeFilter,
     transition: isSwiping ? 'none' : 'filter 0.4s ease',
     overflow: 'hidden',
     position: 'absolute',
-    inset: 0, // top:0, right:0, bottom:0, left:0
+    inset: 0,
     zIndex: 0,
     backgroundColor: isDarkMode ? '#101624' : '#FEFEFE' 
   };
@@ -184,8 +178,8 @@ export const App: React.FC = () => {
     zIndex: 50,
     backgroundColor: isDarkMode ? '#0A0F17' : '#FFFFFF',
     boxShadow: '-16px 0 40px -10px rgba(0,0,0,0.5)',
-    // LOCK VERTICAL SCROLL WHEN SWIPING
-    overflowY: (isSwiping || swipeX > 0) ? 'hidden' : 'auto'
+    // NOTE: Overflow is handled by the inner container, not this wrapper, 
+    // to allow the back button to stay fixed.
   };
 
   // Helpers
@@ -205,13 +199,13 @@ export const App: React.FC = () => {
   };
 
   return (
-    // FIX 1: Root container is fixed inset-0 to prevent browser rubber-band effect on the whole page
+    // FIX 1: Root container fixed to prevent body scroll
     <div className={`fixed inset-0 font-sans overflow-hidden bg-black overscroll-none`}>
       
       {/* --- LAYER 1: HOME VIEW (Fixed Background) --- */}
       <div style={homeStyle} className="flex flex-col w-full h-full">
         
-        {/* === Header (Flex Item, Fixed height) === */}
+        {/* === Header === */}
         <div className="flex-none z-10 w-full">
            {/* Mobile Header */}
           <nav className="md:hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3">
@@ -266,18 +260,18 @@ export const App: React.FC = () => {
         </div>
 
         {/* === Scrollable Content (Flex 1) === */}
-        {/* FIX 2: Ensure this area takes all remaining height and scrolls internally */}
-        {/* overscroll-y-contain prevents the scroll from chaining to the parent and moving the whole page */}
-        <div className={`flex-1 overflow-y-auto overscroll-y-contain w-full relative ${isDetailViewOpen ? 'pointer-events-none' : ''}`}>
-          <main className="py-6 px-4 sm:px-6 lg:px-8 pb-32">
-            <div className="max-w-7xl mx-auto animate-fade-in">
+        {/* FIX 1: Removed overscroll-y-contain to allow natural bounce even when empty */}
+        <div className={`flex-1 overflow-y-auto w-full relative ${isDetailViewOpen ? 'pointer-events-none' : ''}`}>
+          {/* Added min-h-[101%] to force scrollability for bounce effect */}
+          <main className="py-6 px-4 sm:px-6 lg:px-8 pb-32 min-h-[101%]">
+            <div className="max-w-7xl mx-auto animate-fade-in h-full">
               {isLoadingHistory ? (
-                <div className="flex flex-col items-center justify-center min-h-[300px] text-gray-400">
+                <div className="flex flex-col items-center justify-center min-h-[60vh] text-gray-400">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-trade-accent mb-4"></div>
                   <p className="text-sm">正在加载历史记录...</p>
                 </div>
               ) : history.length === 0 ? (
-                <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-8">
+                <div className="flex flex-col items-center justify-center min-h-[70vh] text-center p-8">
                     <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
                       <span className="text-3xl">📝</span>
                     </div>
@@ -323,8 +317,7 @@ export const App: React.FC = () => {
           </main>
         </div>
 
-        {/* === Floating Action Bar (Fixed at Bottom of Home Layer) === */}
-        {/* Absolute position relative to the Home Container, not the screen, but since Home is fixed, it acts fixed */}
+        {/* === Floating Action Bar === */}
         <div className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 z-40 transition-opacity duration-300 ${isDetailViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full px-2 py-2 flex items-center shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-100 dark:border-gray-700">
             <button className="w-12 h-12 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
@@ -357,32 +350,43 @@ export const App: React.FC = () => {
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
-          className="overflow-y-auto custom-scrollbar overscroll-y-contain"
+          className="bg-white dark:bg-gray-900" // Ensure background is set
         >
-          {/* Fixed Floating Back Button */}
+          {/* FIX 2: Back Button is now a SIBLING to the scroll container.
+              It is absolutely positioned relative to the FIXED detail container.
+              This means it stays fixed on screen, even when the inner content scrolls.
+              Moved top-4 (higher). */}
           <button 
             onClick={() => setStep(AppStep.HOME)}
-            className="fixed top-6 left-4 z-[60] p-2.5 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md rounded-full shadow-lg border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:scale-105 active:scale-95 transition-all"
+            className="absolute top-4 left-4 z-[60] p-2.5 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md rounded-full shadow-lg border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:scale-105 active:scale-95 transition-all"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
           </button>
 
-          <main className="px-4 sm:px-6 lg:px-8 pb-12 pt-0">
-             {step === AppStep.AI_ANALYSIS && tradeConfig && (
-               <Dashboard config={tradeConfig} onComplete={handleAnalysisComplete} />
-             )}
-             {step === AppStep.HISTORY_DETAIL && selectedRecord && (
-               <div className="pt-12">
-                 <AnalysisView 
-                   config={selectedRecord.config}
-                   marketState={selectedRecord.market}
-                   analysis={selectedRecord.analysis}
-                 />
-               </div>
-             )}
-          </main>
+          {/* Inner Scroll Container - Occupies full space behind the button */}
+          <div 
+             className="w-full h-full overflow-y-auto custom-scrollbar"
+             // Lock vertical scroll only when horizontal swipe is active
+             style={{ overflowY: (isSwiping || swipeX > 0) ? 'hidden' : 'auto' }}
+          >
+            {/* Added pt-20 to clear the absolute button */}
+            <main className="px-4 sm:px-6 lg:px-8 pb-12 pt-20">
+              {step === AppStep.AI_ANALYSIS && tradeConfig && (
+                <Dashboard config={tradeConfig} onComplete={handleAnalysisComplete} />
+              )}
+              {step === AppStep.HISTORY_DETAIL && selectedRecord && (
+                <div className="animate-fade-in-up">
+                  <AnalysisView 
+                    config={selectedRecord.config}
+                    marketState={selectedRecord.market}
+                    analysis={selectedRecord.analysis}
+                  />
+                </div>
+              )}
+            </main>
+          </div>
         </div>
       )}
 
