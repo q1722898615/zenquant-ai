@@ -164,9 +164,7 @@ export const App: React.FC = () => {
 
   // 1. Home View Styles (Background Layer)
   const homeStyle: React.CSSProperties = {
-    // REMOVED: filter: homeFilter, 
-    // REMOVED: transition: isSwiping ? 'none' : 'filter 0.4s ease',
-    overflow: 'hidden',
+    // FIX: Removed overflow: hidden to prevent iOS scroll locking on child elements
     position: 'absolute',
     inset: 0,
     zIndex: 0,
@@ -268,7 +266,7 @@ export const App: React.FC = () => {
           className="flex-1 overflow-y-auto w-full relative touch-pan-y" 
           style={{ 
             WebkitOverflowScrolling: 'touch', 
-            transform: 'translate3d(0,0,0)' // Hardware acceleration for smoother scroll isolation
+            // FIX: Removed transform: translate3d as it creates a stacking context that can interfere with touch events on iOS when overlay changes
           }}
         >
           {/* Added min-h-[101%] to force scrollability for bounce effect */}
@@ -332,7 +330,9 @@ export const App: React.FC = () => {
           style={{ 
             opacity: backdropOpacity, 
             transition: isSwiping ? 'none' : 'opacity 0.4s ease',
-            zIndex: 20 
+            zIndex: 20,
+            // FIX: Explicitly hide the overlay when not in use to ensure it doesn't block interactions
+            visibility: isDetailViewOpen ? 'visible' : 'hidden'
           }}
         />
 
