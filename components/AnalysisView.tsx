@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { TradeConfig, MarketState, AnalysisResult } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
@@ -11,11 +12,18 @@ interface Props {
 }
 
 export const AnalysisView: React.FC<Props> = ({ config, marketState, analysis, onAction, actionLabel }) => {
+  // Safe access to marketState properties to prevent white screen on data errors
+  const safeMarketState = marketState || { 
+    ema200: 0, ema12: 0, ma50: 0, currentPrice: 0, 
+    macd: { histogram: 0, line: 0, signal: 0 }, 
+    rsi: 0 
+  };
+
   const chartData = [
-    { name: 'EMA200', price: marketState.ema200 },
-    { name: 'EMA12', price: marketState.ema12 },
-    { name: 'MA50', price: marketState.ma50 },
-    { name: '现价', price: marketState.currentPrice },
+    { name: 'EMA200', price: safeMarketState.ema200 },
+    { name: 'EMA12', price: safeMarketState.ema12 },
+    { name: 'MA50', price: safeMarketState.ma50 },
+    { name: '现价', price: safeMarketState.currentPrice },
     { name: '入场', price: config.entryPrice },
     { name: '止损', price: config.stopLoss },
     { name: '止盈', price: config.takeProfit },
@@ -97,29 +105,29 @@ export const AnalysisView: React.FC<Props> = ({ config, marketState, analysis, o
             <div className="space-y-4">
               <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-2">
                 <span className="text-gray-500 dark:text-gray-400 text-sm">当前价格</span>
-                <span className="font-mono text-xl text-gray-900 dark:text-white font-bold">${marketState.currentPrice.toLocaleString()}</span>
+                <span className="font-mono text-xl text-gray-900 dark:text-white font-bold">${safeMarketState.currentPrice?.toLocaleString() ?? '---'}</span>
               </div>
               
                <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-2">
                 <span className="text-gray-500 dark:text-gray-400 text-sm">MACD (12,26,9)</span>
                 <div className="text-right">
-                   <span className={`font-mono text-sm block ${marketState.macd.histogram > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                     Hist: {marketState.macd.histogram.toFixed(2)}
+                   <span className={`font-mono text-sm block ${safeMarketState.macd?.histogram > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                     Hist: {safeMarketState.macd?.histogram?.toFixed(2) ?? '0.00'}
                    </span>
-                   <span className="text-xs text-gray-400 dark:text-gray-500">L: {marketState.macd.line.toFixed(2)} | S: {marketState.macd.signal.toFixed(2)}</span>
+                   <span className="text-xs text-gray-400 dark:text-gray-500">L: {safeMarketState.macd?.line?.toFixed(2) ?? '0'} | S: {safeMarketState.macd?.signal?.toFixed(2) ?? '0'}</span>
                 </div>
               </div>
 
               <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-2">
                 <span className="text-gray-500 dark:text-gray-400 text-sm">RSI (14)</span>
-                <span className={`font-mono font-bold ${marketState.rsi > 70 ? 'text-red-600 dark:text-red-400' : marketState.rsi < 30 ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                  {marketState.rsi}
+                <span className={`font-mono font-bold ${safeMarketState.rsi > 70 ? 'text-red-600 dark:text-red-400' : safeMarketState.rsi < 30 ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                  {safeMarketState.rsi?.toFixed(1) ?? '---'}
                 </span>
               </div>
               
                <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-2">
                 <span className="text-gray-500 dark:text-gray-400 text-sm">EMA 200</span>
-                <span className="font-mono text-gray-600 dark:text-gray-300">{marketState.ema200}</span>
+                <span className="font-mono text-gray-600 dark:text-gray-300">{safeMarketState.ema200?.toLocaleString() ?? '---'}</span>
               </div>
             </div>
           </div>

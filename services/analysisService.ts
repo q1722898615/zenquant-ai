@@ -1,6 +1,7 @@
 
 import { request } from './api';
 import { TradeConfig, MarketState, AnalysisResult, AnalysisRecord, TradeSide } from '../types';
+import { normalizeMarketState } from './marketService';
 
 // 后端 AnalysisRecord 的结构 (snake_case)
 interface BackendAnalysisRecord {
@@ -13,7 +14,7 @@ interface BackendAnalysisRecord {
   recommendation: string;
   confidence: number;
   trade_config: TradeConfig;
-  market_state: MarketState;
+  market_state: any; // Raw backend data usually in snake_case
   analysis_result: AnalysisResult;
   created_at: string;
 }
@@ -96,7 +97,7 @@ const mapBackendRecordToFrontend = (record: BackendAnalysisRecord): AnalysisReco
     id: record.id,
     timestamp: new Date(record.created_at).getTime(),
     config: record.trade_config,
-    market: record.market_state,
+    market: normalizeMarketState(record.market_state),
     analysis: record.analysis_result
   };
 };

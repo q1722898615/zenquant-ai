@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { PsychologyCheck } from './components/PsychologyCheck';
 import { TradeForm } from './components/TradeForm';
@@ -11,6 +12,7 @@ export const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>(AppStep.HOME);
   const [tradeConfig, setTradeConfig] = useState<TradeConfig | null>(null);
   const [history, setHistory] = useState<AnalysisRecord[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState<AnalysisRecord | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,8 +20,13 @@ export const App: React.FC = () => {
   // Load History from Backend
   useEffect(() => {
     const loadHistory = async () => {
-      const records = await fetchAnalysisHistory(20);
-      setHistory(records);
+      setIsLoadingHistory(true);
+      try {
+        const records = await fetchAnalysisHistory(20);
+        setHistory(records);
+      } finally {
+        setIsLoadingHistory(false);
+      }
     };
     loadHistory();
   }, []);
@@ -173,7 +180,12 @@ export const App: React.FC = () => {
         {/* Render Home Content if we are in Home OR in Setup Phase (Background) */}
         {(step === AppStep.HOME || isSetupPhase) && (
           <div className="max-w-7xl mx-auto animate-fade-in">
-            {history.length === 0 ? (
+            {isLoadingHistory ? (
+              <div className="flex flex-col items-center justify-center min-h-[300px] text-gray-400">
+                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-trade-accent mb-4"></div>
+                 <p className="text-sm">正在加载历史记录...</p>
+              </div>
+            ) : history.length === 0 ? (
                <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-8">
                   <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
                     <span className="text-3xl">📝</span>
