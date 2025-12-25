@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PsychologyCheck } from './components/PsychologyCheck';
 import { TradeForm } from './components/TradeForm';
 import { Dashboard } from './components/Dashboard';
@@ -23,6 +23,10 @@ export const App: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<AnalysisRecord | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Swipe gesture state
+  const touchStartRef = useRef<number | null>(null);
+  const touchEndRef = useRef<number | null>(null);
 
   // Load All Initial Data (History + Form Dependencies)
   useEffect(() => {
@@ -102,6 +106,30 @@ export const App: React.FC = () => {
   // Close drawer logic
   const handleCloseDrawer = () => {
     setStep(AppStep.HOME);
+  };
+
+  // Swipe Handlers
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchEndRef.current = null;
+    touchStartRef.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    touchEndRef.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStartRef.current || !touchEndRef.current) return;
+    
+    const distance = touchEndRef.current - touchStartRef.current;
+    const isLeftEdge = touchStartRef.current < 50; // Started from left edge (within 50px)
+    const isSwipeRight = distance > 70; // Swiped right enough
+
+    if (isLeftEdge && isSwipeRight) {
+      if (step === AppStep.HISTORY_DETAIL) {
+        setStep(AppStep.HOME);
+      }
+    }
   };
 
   const getRecBadgeColor = (rec: string) => {
@@ -299,22 +327,29 @@ export const App: React.FC = () => {
         )}
 
         {step === AppStep.HISTORY_DETAIL && selectedRecord && (
-          <div className="animate-fade-in">
-             <div className="max-w-6xl mx-auto mb-6 flex justify-between items-center">
-                <button 
-                  onClick={() => setStep(AppStep.HOME)} 
-                  className="flex items-center gap-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <span>←</span> 返回列表
-                </button>
+          <div 
+            className="animate-fade-in min-h-screen"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
+             {/* Fixed Floating Back Button */}
+             <button 
+                onClick={() => setStep(AppStep.HOME)}
+                className="fixed top-6 left-4 z-50 p-2.5 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md rounded-full shadow-lg border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:scale-105 active:scale-95 transition-all"
+             >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+             </button>
+
+             <div className="pt-12">
+               <AnalysisView 
+                 config={selectedRecord.config}
+                 marketState={selectedRecord.market}
+                 analysis={selectedRecord.analysis}
+               />
              </div>
-             <AnalysisView 
-               config={selectedRecord.config}
-               marketState={selectedRecord.market}
-               analysis={selectedRecord.analysis}
-               onAction={() => setStep(AppStep.HOME)}
-               actionLabel="🔙 返回主页"
-             />
           </div>
         )}
       </main>

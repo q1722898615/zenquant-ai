@@ -7,11 +7,11 @@ interface Props {
   config: TradeConfig;
   marketState: MarketState;
   analysis: AnalysisResult;
-  onAction: () => void;
-  actionLabel: string;
+  onAction?: () => void; // Made optional as button is removed
+  actionLabel?: string; // Made optional
 }
 
-export const AnalysisView: React.FC<Props> = ({ config, marketState, analysis, onAction, actionLabel }) => {
+export const AnalysisView: React.FC<Props> = ({ config, marketState, analysis }) => {
   // Safe access to marketState properties to prevent white screen on data errors
   const safeMarketState = marketState || { 
     ema200: 0, ema12: 0, ma50: 0, currentPrice: 0, 
@@ -48,7 +48,7 @@ export const AnalysisView: React.FC<Props> = ({ config, marketState, analysis, o
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-4 animate-fade-in pb-20">
+    <div className="max-w-6xl mx-auto p-4 animate-fade-in pb-10">
       {/* Header Result */}
       <div className={`text-center p-8 border-2 rounded-xl mb-8 shadow-2xl transition-all duration-500 ${getRecColor(analysis.recommendation)}`}>
         <p className="text-gray-500 dark:text-gray-400 text-sm uppercase tracking-widest mb-3 font-semibold">AI 最终决策建议</p>
@@ -150,13 +150,6 @@ export const AnalysisView: React.FC<Props> = ({ config, marketState, analysis, o
                </ResponsiveContainer>
              </div>
           </div>
-
-          <button 
-            onClick={onAction}
-            className="w-full py-4 bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg border border-transparent dark:border-gray-600 transition-all duration-200"
-          >
-            {actionLabel}
-          </button>
         </div>
       </div>
     </div>

@@ -45,10 +45,6 @@ export const Dashboard: React.FC<Props> = ({ config, onComplete }) => {
 
   const handleFinish = () => {
     if (marketState && analysis) {
-      // 在后端架构下，记录的保存通常在 POST /analysis/evaluate 时已经由后端处理，或者单独调用 save 接口
-      // 这里为了兼容现有 App.tsx 的 state 更新逻辑，我们构造一个 record 返回给父组件
-      // 注意：真正的 ID 应该是后端的，这里仅用于前端 UI 乐观更新，
-      // 实际刷新页面后会从 GET /analysis/records 重新拉取
       const record: AnalysisRecord = {
         id: crypto.randomUUID(),
         timestamp: Date.now(),
@@ -100,12 +96,23 @@ export const Dashboard: React.FC<Props> = ({ config, onComplete }) => {
   if (!analysis || !marketState) return null;
 
   return (
-    <AnalysisView 
-      config={config} 
-      marketState={marketState} 
-      analysis={analysis} 
-      onAction={handleFinish}
-      actionLabel="🏁 结束并返回主页"
-    />
+    <div className="relative pt-12">
+        {/* Floating Done/Exit Button for Dashboard (since we removed the button from AnalysisView) */}
+        <button 
+          onClick={handleFinish}
+          className="fixed top-6 right-4 z-50 px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full font-bold shadow-xl border border-transparent hover:scale-105 transition-transform flex items-center gap-2"
+        >
+          <span>完成</span>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </button>
+
+        <AnalysisView 
+          config={config} 
+          marketState={marketState} 
+          analysis={analysis} 
+        />
+    </div>
   );
 };
