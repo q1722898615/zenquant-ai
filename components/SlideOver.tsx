@@ -44,11 +44,23 @@ export const SlideOver: React.FC<SlideOverProps> = ({ isOpen, onClose, children,
   }, [isOpen]);
 
   // --- Gesture Logic (Edge Swipe Only) ---
+
+  const snapBack = () => {
+    if (panelRef.current) {
+      panelRef.current.style.transition = 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)';
+      panelRef.current.style.transform = 'translateX(0%)';
+    }
+    if (backdropRef.current) {
+      backdropRef.current.style.transition = 'opacity 0.3s ease';
+      backdropRef.current.style.opacity = '1';
+    }
+    isDragging.current = false;
+    startX.current = null;
+  };
   
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     // Only Trigger if starting from the left edge (iOS Back Swipe style)
-    // This prevents conflict with horizontal charts or internal sliders
     if (touch.clientX < 40) {
       startX.current = touch.clientX;
       isDragging.current = true;
@@ -82,28 +94,31 @@ export const SlideOver: React.FC<SlideOverProps> = ({ isOpen, onClose, children,
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isDragging.current || startX.current === null) return;
-    isDragging.current = false;
     
     const touch = e.changedTouches[0];
     const dx = touch.clientX - startX.current;
     
-    // Restore transition for snap animation
-    if (panelRef.current) {
-      panelRef.current.style.transition = 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)';
-    }
-    if (backdropRef.current) {
-      backdropRef.current.style.transition = 'opacity 0.3s ease';
-    }
-
     // Threshold to close: Dragged more than 100px
     if (dx > 100) {
+      // Restore transition for smooth exit (handled by useEffect when onClose changes prop)
+      if (panelRef.current) {
+        panelRef.current.style.transition = 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)';
+      }
+      isDragging.current = false;
+      startX.current = null;
       onClose();
     } else {
-      // Snap back to open
-      if (panelRef.current) panelRef.current.style.transform = 'translateX(0%)';
-      if (backdropRef.current) backdropRef.current.style.opacity = '1';
+      snapBack();
     }
-    startX.current = null;
+  };
+
+  // Fix for "stuck" state:
+  // If the browser interrupts the gesture (e.g. for native scrolling), it fires touchcancel.
+  // We must reset the position here to avoid the panel being stuck in the middle of a drag.
+  const handleTouchCancel = () => {
+    if (isDragging.current) {
+      snapBack();
+    }
   };
 
   if (!isVisible) return null;
@@ -124,6 +139,7 @@ export const SlideOver: React.FC<SlideOverProps> = ({ isOpen, onClose, children,
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
         // Critical: 'pan-y' tells browser to handle vertical scrolling, 
         // leaving horizontal gestures for our JS code.
         style={{ touchAction: 'pan-y' }}
