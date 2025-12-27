@@ -48,6 +48,7 @@ export interface MarketState {
 }
 
 export interface TradeConfig {
+  // === 必填输入字段 ===
   symbol: string;
   side: TradeSide;
   timeframe: string;
@@ -58,6 +59,14 @@ export interface TradeConfig {
   riskPercentage: number;
   leverage: number;
   strategy: string; // 后端只接收策略名称或ID字符串
+
+  // === 新增计算字段 (可选，由前端计算后传入后端) ===
+  quantity?: number;              // 开仓数量
+  notional?: number;              // 名义价值 = quantity * entryPrice
+  margin?: number;                // 所需保证金 = notional / leverage
+  estimatedRiskAmount?: number;   // 预计风险金额 = balance * risk%
+  estimatedFee?: number;          // 预计手续费
+  marginUsagePercent?: number;    // 保证金使用率% = margin / balance * 100
 }
 
 export interface AnalysisResult {

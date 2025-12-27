@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TradeConfig, TradeSide, Strategy, SymbolData } from '../types';
-import { calculatePositionSize } from '../utils/calculations';
+import { calculateTradeDetails } from '../utils/calculations';
 import { searchSymbols } from '../services/marketService';
 
 interface Props {
@@ -22,7 +22,7 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack, strategies, popular
   const symbolDropdownRef = useRef<HTMLDivElement>(null);
   const strategyDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Form State
+  // Form State (User Inputs)
   const [config, setConfig] = useState<TradeConfig>({
     symbol: 'BTC/USDT', 
     side: TradeSide.LONG,
@@ -36,7 +36,9 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack, strategies, popular
     strategy: ''
   });
 
-  const [positionSize, setPositionSize] = useState<{ quantity: number, notional: number, margin: number } | null>(null);
+  // Derived State (Calculated fields)
+  // Calculate details on every render (or useMemo) to ensure UI is always in sync with inputs
+  const fullConfig = useMemo(() => calculateTradeDetails(config), [config]);
 
   // Initialize display symbols & default strategy
   useEffect(() => {
@@ -49,7 +51,7 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack, strategies, popular
     if (!config.strategy && strategies.length > 0) {
       handleChange('strategy', strategies[0].name);
     }
-  }, [strategies, popularSymbols]); // Only run when props update (or on mount)
+  }, [strategies, popularSymbols]);
 
   // Handle Click Outside for both dropdowns
   useEffect(() => {
@@ -91,17 +93,6 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack, strategies, popular
     return () => clearTimeout(timer);
   }, [config.symbol, popularSymbols]);
 
-  useEffect(() => {
-    const size = calculatePositionSize(
-      config.accountBalance,
-      config.riskPercentage,
-      config.entryPrice,
-      config.stopLoss,
-      config.leverage
-    );
-    setPositionSize(size);
-  }, [config.accountBalance, config.riskPercentage, config.entryPrice, config.stopLoss, config.leverage]);
-
   const handleChange = (field: keyof TradeConfig, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
@@ -122,7 +113,18 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack, strategies, popular
     setIsStrategyDropdownOpen(false);
   };
 
-  const isFormValid = config.entryPrice > 0 && config.stopLoss > 0 && config.takeProfit > 0 && config.symbol.length > 0 && config.strategy.length > 0;
+  // Validation Logic
+  const marginUsage = fullConfig.marginUsagePercent || 0;
+  const isMarginSafe = marginUsage <= 100;
+  const isMarginWarning = marginUsage > 30 && marginUsage <= 100;
+  
+  const isFormValid = 
+    config.entryPrice > 0 && 
+    config.stopLoss > 0 && 
+    config.takeProfit > 0 && 
+    config.symbol.length > 0 && 
+    config.strategy.length > 0 &&
+    isMarginSafe; // Block if margin usage > 100%
 
   const currentStrategyDesc = strategies.find(s => s.name === config.strategy)?.description;
 
@@ -344,37 +346,62 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack, strategies, popular
             <div className="text-left">
                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">预计亏损 (Risk)</p>
                <p className="text-xl font-mono text-red-500 dark:text-red-400 font-bold tracking-tight">
-                 ${((config.accountBalance * config.riskPercentage) / 100).toFixed(2)}
+                 ${fullConfig.estimatedRiskAmount?.toFixed(2) ?? '---'}
                </p>
             </div>
             <div className="text-left">
               <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">开仓数量 (Coins)</p>
               <p className="text-xl font-mono text-blue-600 dark:text-blue-400 font-bold tracking-tight">
-                {positionSize ? positionSize.quantity.toFixed(4) : '---'}
+                {fullConfig.quantity?.toFixed(4) ?? '---'}
               </p>
             </div>
             <div className="text-left">
               <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">名义价值 (Value)</p>
               <p className="text-xl font-mono text-gray-700 dark:text-gray-300 tracking-tight">
-                 ${positionSize ? positionSize.notional.toFixed(0) : '---'}
+                 ${fullConfig.notional?.toFixed(0) ?? '---'}
               </p>
             </div>
-            <div className="text-left">
+            <div className="text-left relative">
               <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">保证金 (Margin)</p>
               <p className="text-xl font-mono text-yellow-600 dark:text-yellow-400 font-bold tracking-tight">
-                 ${positionSize ? positionSize.margin.toFixed(2) : '---'}
+                 ${fullConfig.margin?.toFixed(2) ?? '---'}
               </p>
             </div>
         </div>
+
+        {/* Margin Usage Warning/Error Panel */}
+        {(marginUsage > 0) && (
+          <div className={`mt-4 rounded-lg p-3 flex items-start gap-3 text-sm transition-all ${
+            !isMarginSafe 
+              ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' 
+              : isMarginWarning 
+                ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
+                : 'opacity-0 h-0 p-0 m-0 overflow-hidden' // Hide if safe
+          }`}>
+             <div className="flex-shrink-0 mt-0.5">
+               {!isMarginSafe ? '🚫' : '⚠️'}
+             </div>
+             <div>
+               <p className={`font-bold ${!isMarginSafe ? 'text-red-700 dark:text-red-400' : 'text-yellow-700 dark:text-yellow-400'}`}>
+                 保证金使用率: {marginUsage.toFixed(1)}%
+               </p>
+               <p className={`text-xs mt-1 ${!isMarginSafe ? 'text-red-600 dark:text-red-300' : 'text-yellow-600 dark:text-yellow-300'}`}>
+                 {!isMarginSafe 
+                   ? "保证金已超过账户余额 (100%)，请降低仓位、减少风险或增加杠杆。" 
+                   : "保证金占用超过 30%，建议保持轻仓以应对市场波动。"}
+               </p>
+             </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-8">
         <button 
-          onClick={() => onNext(config)}
+          onClick={() => onNext(fullConfig)}
           disabled={!isFormValid}
           className={`w-full h-14 rounded-2xl font-bold text-lg tracking-wide transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 ${isFormValid ? 'bg-trade-accent text-white hover:bg-blue-600' : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'}`}
         >
-          开始 AI 智能分析
+          {!isMarginSafe ? "保证金不足 · 无法执行" : "开始 AI 智能分析"}
         </button>
       </div>
     </div>
