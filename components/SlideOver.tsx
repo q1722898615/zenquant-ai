@@ -17,7 +17,17 @@ export const SlideOver: React.FC<SlideOverProps> = ({ isOpen, onClose, children,
   const startX = useRef<number | null>(null);
   const isDragging = useRef(false);
 
-  // Synchronize internal visibility with animation timing
+  // --- 1. Dedicated Scroll Lock Effect ---
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  // --- 2. Animation Logic ---
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
@@ -28,8 +38,6 @@ export const SlideOver: React.FC<SlideOverProps> = ({ isOpen, onClose, children,
           if (backdropRef.current) backdropRef.current.style.opacity = '1';
         });
       });
-      // Lock body scroll
-      document.body.style.overflow = 'hidden';
     } else {
       // Animate out
       if (panelRef.current) panelRef.current.style.transform = 'translateX(100%)';
@@ -37,7 +45,7 @@ export const SlideOver: React.FC<SlideOverProps> = ({ isOpen, onClose, children,
       
       const timer = setTimeout(() => {
         setIsVisible(false);
-        document.body.style.overflow = '';
+        // Scroll lock is handled by the dedicated effect
       }, 300); // Match CSS transition duration
       return () => clearTimeout(timer);
     }
