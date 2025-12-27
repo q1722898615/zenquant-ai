@@ -24,13 +24,19 @@ export const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // --- Gesture & Animation State ---
-  const [isSwiping, setIsSwiping] = useState(false);
-  // New state to track the "exiting" phase of the detail view
-  const [isClosing, setIsClosing] = useState(false);
-  const [swipeX, setSwipeX] = useState(0); // Current X translation in pixels
+  // --- Gesture & Animation Refs (Performance Optimization) ---
+  // We use refs instead of state for gestures to avoid re-renders during 60fps animations
+  const detailViewRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number | null>(null);
-  const touchStartTime = useRef<number>(0); // Timer for velocity calculation
+  const touchStartY = useRef<number | null>(null);
+  const currentSwipeX = useRef(0);
+  const isDragging = useRef(false);
+  const touchStartTime = useRef<number>(0);
+
+  // Still need state for the "closing" phase to manage component lifecycle
+  const [isClosing, setIsClosing] = useState(false);
+
   const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 375;
   const isDetailViewOpen = step === AppStep.HISTORY_DETAIL || step === AppStep.AI_ANALYSIS;
 
@@ -81,13 +87,9 @@ export const App: React.FC = () => {
   const handleTradeConfigSubmit = (config: TradeConfig) => {
     setTradeConfig(config);
     setStep(AppStep.AI_ANALYSIS); 
-    // Reset swipe state when entering new view
-    setSwipeX(0);
-    setIsSwiping(false);
-    setIsClosing(false);
+    resetGestureState();
   };
 
-  // Called silently by Dashboard when analysis is ready, just to save the record
   const handleAnalysisComplete = async (newRecord: AnalysisRecord) => {
     try {
       const records = await fetchAnalysisHistory(20);
@@ -100,117 +102,128 @@ export const App: React.FC = () => {
   const handleViewHistory = (record: AnalysisRecord) => {
     setSelectedRecord(record);
     setStep(AppStep.HISTORY_DETAIL);
-    setSwipeX(0);
-    setIsSwiping(false);
-    setIsClosing(false);
+    resetGestureState();
   };
 
   const handleCloseDrawer = () => {
     setStep(AppStep.HOME);
   };
 
-  // --- Gesture Logic ---
+  const resetGestureState = () => {
+    setIsClosing(false);
+    currentSwipeX.current = 0;
+    isDragging.current = false;
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  // --- Gesture Logic (Direct DOM Manipulation) ---
 
   const onTouchStart = (e: React.TouchEvent) => {
-    // Only enable swipe if we are in a detail view
+    // Only enable swipe if we are in a detail view and not currently animating out
     if (!isDetailViewOpen || isClosing) return;
 
-    const startX = e.touches[0].clientX;
-    // Sensitivity threshold: 70px from left edge
-    if (startX < 70) {
-      touchStartX.current = startX;
-      touchStartTime.current = Date.now(); // Start timer
-      setIsSwiping(true);
+    const clientX = e.touches[0].clientX;
+    const clientY = e.touches[0].clientY;
+
+    // Edge swipe detection: Only start if within 70px of left edge
+    if (clientX < 70) {
+      touchStartX.current = clientX;
+      touchStartY.current = clientY;
+      touchStartTime.current = Date.now();
+      isDragging.current = true;
+      
+      // Disable transitions for instant follow
+      if (detailViewRef.current) {
+        detailViewRef.current.style.transition = 'none';
+      }
+      if (backdropRef.current) {
+        backdropRef.current.style.transition = 'none';
+      }
     } else {
       touchStartX.current = null;
     }
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    if (!isSwiping || touchStartX.current === null) return;
+    if (!isDragging.current || touchStartX.current === null || !detailViewRef.current) return;
     
-    const currentX = e.touches[0].clientX;
-    const delta = currentX - touchStartX.current;
+    const clientX = e.touches[0].clientX;
+    const clientY = e.touches[0].clientY;
+    const deltaX = clientX - touchStartX.current;
     
-    // Prevent dragging to the left (negative)
-    if (delta > 0) {
-      setSwipeX(delta);
+    // Scroll Conflict Resolution:
+    // If vertical movement is greater than horizontal on the first significant move,
+    // assume user wants to scroll the content, not swipe the page.
+    if (touchStartY.current !== null) {
+      const deltaY = Math.abs(clientY - touchStartY.current);
+      // Threshold of 5px to determine intent
+      if (deltaY > 5 && deltaY > Math.abs(deltaX)) {
+        isDragging.current = false;
+        touchStartX.current = null;
+        touchStartY.current = null;
+        // Restore transition just in case
+        detailViewRef.current.style.transition = 'transform 0.3s ease-out';
+        return;
+      }
+    }
+
+    // Prevent dragging to the left (negative values)
+    if (deltaX > 0) {
+      currentSwipeX.current = deltaX;
+      
+      // Direct DOM update (No React Render)
+      detailViewRef.current.style.transform = `translateX(${deltaX}px)`;
+      
+      // Update backdrop opacity directly
+      if (backdropRef.current) {
+        // Map 0 -> ScreenWidth to 0.3 -> 0 opacity
+        const opacity = Math.max(0, 0.3 * (1 - deltaX / screenWidth));
+        backdropRef.current.style.opacity = opacity.toString();
+      }
     }
   };
 
   const onTouchEnd = () => {
-    if (!isSwiping) return;
+    if (!isDragging.current || !detailViewRef.current) return;
 
-    setIsSwiping(false);
-    
+    isDragging.current = false;
+    touchStartX.current = null;
+    touchStartY.current = null;
+
     // Calculate velocity
     const touchEndTime = Date.now();
     const timeDiff = touchEndTime - touchStartTime.current;
-    const velocity = swipeX / Math.max(timeDiff, 1); // px/ms
+    const velocity = currentSwipeX.current / Math.max(timeDiff, 1); // px/ms
 
-    touchStartX.current = null;
+    // Restore smooth transitions for the snap/close animation
+    detailViewRef.current.style.transition = 'transform 0.2s cubic-bezier(0.15, 0.85, 0.15, 1)';
+    if (backdropRef.current) {
+      backdropRef.current.style.transition = 'opacity 0.2s ease';
+    }
 
-    // Threshold Logic:
-    // 1. Distance > 40% of screen (Standard slow drag threshold)
-    // 2. OR Fast Flick (Velocity > 0.5 px/ms) with minimal movement (>50px)
-    const isDistanceMet = swipeX > screenWidth * 0.4;
-    const isFlick = velocity > 0.5 && swipeX > 50;
+    // Logic: Close if dragged > 40% OR Fast Flick
+    const isDistanceMet = currentSwipeX.current > screenWidth * 0.4;
+    const isFlick = velocity > 0.5 && currentSwipeX.current > 50;
 
     if (isDistanceMet || isFlick) {
-      // Start exit sequence
+      // Animate Out
       setIsClosing(true);
+      detailViewRef.current.style.transform = `translateX(100%)`;
+      if (backdropRef.current) backdropRef.current.style.opacity = '0';
       
-      // Animate out completely
-      setSwipeX(screenWidth); 
-      
-      // Shortened delay to 200ms for snappier feel
+      // Wait for animation to finish, then unmount
       setTimeout(() => {
         setStep(AppStep.HOME);
-        setSwipeX(0); 
         setIsClosing(false);
+        currentSwipeX.current = 0;
       }, 200);
     } else {
-      // Snap back
-      setSwipeX(0);
+      // Snap Back
+      detailViewRef.current.style.transform = `translateX(0px)`;
+      if (backdropRef.current) backdropRef.current.style.opacity = '0.3';
+      currentSwipeX.current = 0;
     }
-  };
-
-  // --- Animation Styles Calculation ---
-  
-  const progress = Math.min(Math.max(swipeX / screenWidth, 0), 1);
-  
-  // Opacity for the black overlay
-  const backdropOpacity = isDetailViewOpen && !isClosing ? (1 - progress) * 0.3 : 0;
-
-  // Logic: Show floating bar if we are at HOME OR if we are currently closing the detail view.
-  // This makes the bar appear immediately when the user lets go of the swipe.
-  const showFloatingBar = !isDetailViewOpen || isClosing;
-  
-  // Logic: Allow interaction with Home if HOME OR if Closing.
-  // This prevents the "scroll freeze" by enabling pointer events on Home as soon as the closing animation starts.
-  const isHomeInteractive = !isDetailViewOpen || isClosing;
-
-  // 1. Home View Styles (Background Layer)
-  const homeStyle: React.CSSProperties = {
-    position: 'absolute',
-    inset: 0,
-    zIndex: 0,
-    backgroundColor: isDarkMode ? '#101624' : '#FEFEFE' 
-  };
-
-  // 2. Detail View Styles (Foreground Layer)
-  const detailStyle: React.CSSProperties = {
-    transform: `translateX(${swipeX}px)`,
-    // Faster transition (0.2s) to match the new timeout
-    transition: isSwiping ? 'none' : 'transform 0.2s cubic-bezier(0.15, 0.85, 0.15, 1)',
-    position: 'fixed',
-    inset: 0,
-    zIndex: 50,
-    backgroundColor: isDarkMode ? '#0A0F17' : '#FFFFFF',
-    boxShadow: '-16px 0 40px -10px rgba(0,0,0,0.5)',
-    // IMPORTANT: Disable pointer events on the detail view when it is animating out (closing),
-    // so touches fall through to the Home view immediately.
-    pointerEvents: isClosing ? 'none' : 'auto'
   };
 
   // Helpers
@@ -229,12 +242,21 @@ export const App: React.FC = () => {
     }
   };
 
+  // Logic: Show floating bar if we are at HOME OR if we are currently closing the detail view.
+  const showFloatingBar = !isDetailViewOpen || isClosing;
+  
+  // Logic: Allow interaction with Home if HOME OR if Closing.
+  const isHomeInteractive = !isDetailViewOpen || isClosing;
+
   return (
-    // FIX 1: Root container fixed to prevent body scroll
-    <div className={`fixed inset-0 font-sans overflow-hidden bg-black overscroll-none`}>
+    // FIX: Root container with overscroll-none to prevent bounce effects
+    <div className="fixed inset-0 font-sans overflow-hidden bg-black overscroll-none select-none">
       
       {/* --- LAYER 1: HOME VIEW (Fixed Background) --- */}
-      <div style={homeStyle} className="flex flex-col w-full h-full">
+      <div 
+        className="flex flex-col w-full h-full absolute inset-0 z-0"
+        style={{ backgroundColor: isDarkMode ? '#101624' : '#FEFEFE' }}
+      >
         
         {/* === Header === */}
         <div className="flex-none z-10 w-full">
@@ -295,12 +317,7 @@ export const App: React.FC = () => {
           className="flex-1 overflow-y-auto w-full relative touch-pan-y" 
           style={{ 
             WebkitOverflowScrolling: 'touch', 
-            // Control pointer events to prevent "scroll freeze". 
-            // If home is interactive (Home or Closing), allow events. Otherwise (Detail Open), block events.
-            pointerEvents: isHomeInteractive ? 'auto' : 'none',
-            // Also hide overflow when disabled to be safe, though pointer-events usually suffices.
-            // Using overflow-y hidden prevents scrolling entirely.
-            overflowY: isHomeInteractive ? 'auto' : 'hidden'
+            pointerEvents: isHomeInteractive ? 'auto' : 'none'
           }}
         >
           {/* Added min-h-[101%] to force scrollability for bounce effect */}
@@ -360,12 +377,13 @@ export const App: React.FC = () => {
 
         {/* --- Dimming Overlay --- */}
         <div 
+          ref={backdropRef}
           className="absolute inset-0 bg-black pointer-events-none"
           style={{ 
-            opacity: backdropOpacity, 
-            transition: isSwiping ? 'none' : 'opacity 0.2s ease', // Faster transition
+            opacity: (isDetailViewOpen && !isClosing) ? 0.3 : 0, 
+            transition: 'opacity 0.2s ease', 
             zIndex: 20,
-            visibility: (isDetailViewOpen && !isClosing) ? 'visible' : 'hidden'
+            visibility: (isDetailViewOpen || isClosing) ? 'visible' : 'hidden'
           }}
         />
 
@@ -398,15 +416,32 @@ export const App: React.FC = () => {
       {/* --- LAYER 2: DETAIL VIEW (SLIDES OVER) --- */}
       {isDetailViewOpen && (
         <div 
-          style={detailStyle}
+          ref={detailViewRef}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
-          className="bg-white dark:bg-gray-900" // Ensure background is set
+          // FIX: Add touch-action: pan-y to allow vertical scrolling natively while observing horizontal touches
+          className="fixed inset-0 z-50 bg-white dark:bg-gray-900 shadow-2xl will-change-transform touch-pan-y"
+          style={{
+            transform: 'translateX(0)', // Start at 0
+            transition: 'transform 0.2s cubic-bezier(0.15, 0.85, 0.15, 1)', // Default enter/idle state
+            boxShadow: '-16px 0 40px -10px rgba(0,0,0,0.5)',
+            pointerEvents: isClosing ? 'none' : 'auto'
+          }}
         >
-          {/* FIX 2: Back Button is now a SIBLING to the scroll container. */}
+          {/* Back Button */}
           <button 
-            onClick={() => setStep(AppStep.HOME)}
+            onClick={() => {
+              setIsClosing(true);
+              // Trigger the exit animation via ref manually since we are outside the touch handler
+              if (detailViewRef.current) detailViewRef.current.style.transform = 'translateX(100%)';
+              if (backdropRef.current) backdropRef.current.style.opacity = '0';
+              setTimeout(() => {
+                setStep(AppStep.HOME);
+                setIsClosing(false);
+              }, 200);
+            }}
+            // Prevent touch start from triggering drag on the back button itself
             onTouchStart={(e) => e.stopPropagation()}
             className="absolute top-4 left-4 z-[60] p-2.5 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md rounded-full shadow-lg border border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:scale-105 active:scale-95 transition-all"
           >
@@ -415,13 +450,10 @@ export const App: React.FC = () => {
             </svg>
           </button>
 
-          {/* Inner Scroll Container - Occupies full space behind the button */}
+          {/* Inner Scroll Container */}
           <div 
              className="w-full h-full overflow-y-auto custom-scrollbar"
-             // Lock vertical scroll only when horizontal swipe is active
-             style={{ overflowY: (isSwiping || swipeX > 0) ? 'hidden' : 'auto' }}
           >
-            {/* Added pt-20 to clear the absolute button */}
             <main className="px-4 sm:px-6 lg:px-8 pb-12 pt-20">
               {step === AppStep.AI_ANALYSIS && tradeConfig && (
                 <Dashboard config={tradeConfig} onComplete={handleAnalysisComplete} />
