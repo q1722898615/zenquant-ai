@@ -50,6 +50,12 @@
       }
     </script>
     <style>
+      /* Optimize touch handling globally */
+      body {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+
       /* Custom scrollbar for professional feel */
       ::-webkit-scrollbar {
         width: 8px;
