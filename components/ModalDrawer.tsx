@@ -15,37 +15,27 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
   // Cache content to persist it during the exit animation
   const [cachedState, setCachedState] = useState<{ title?: string; children: React.ReactNode } | null>(null);
 
-  // Sync Cached State ONLY when open.
+  // Sync Cached State ONLY when open. 
+  // When closing (isOpen=false), we stop updating this to preserve the last valid state.
   useEffect(() => {
     if (isOpen) {
       setCachedState({ title, children });
     }
   }, [isOpen, title, children]);
 
-  // --- 1. Dedicated Scroll Lock Effect (Safety First) ---
-  // This ensures that no matter how the component is closed or unmounted,
-  // the scroll lock is ALWAYS released immediately.
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    }
-    
-    // Cleanup function runs when isOpen changes to false OR when component unmounts
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
-
-  // --- 2. Animation & Theme Effect ---
+  // Sync Theme Color with Drawer State
   useEffect(() => {
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     const isDarkMode = document.documentElement.classList.contains('dark');
     
     if (isOpen) {
-      // Mount
+      // 1. Mount the component first
       setVisible(true);
+      document.body.style.overflow = 'hidden';
 
-      // Animation Frame for smooth entry
+      // 2. Use double requestAnimationFrame to ensure the browser paints the initial state
+      // (translate-y-full) before applying the transition to active state (translate-y-0).
+      // This is much smoother and more reliable than setTimeout for initial mounting animations.
       const raf = requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setAnimate(true);
@@ -57,17 +47,17 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
       
       return () => cancelAnimationFrame(raf);
     } else {
-      // Unmount sequence
+      // 1. Trigger exit animation
       setAnimate(false);
 
       if (metaThemeColor) {
         metaThemeColor.setAttribute('content', isDarkMode ? '#101624' : '#FEFEFE');
       }
 
-      // Wait for animation to finish before hiding DOM
+      // 2. Unmount after animation finishes (500ms to match CSS duration)
       const timer = setTimeout(() => {
         setVisible(false);
-        // Note: Scroll unlocking is handled by the effect above
+        document.body.style.overflow = '';
       }, 500); 
       return () => clearTimeout(timer);
     }
@@ -75,6 +65,9 @@ export const ModalDrawer: React.FC<Props> = ({ isOpen, onClose, title, children 
 
   if (!visible) return null;
 
+  // Key Logic for Smooth Exit:
+  // If isOpen is true, use live props (and update cache).
+  // If isOpen is false (closing), ignore live props (which might be null/empty) and use the cached valid content.
   const displayTitle = isOpen ? title : cachedState?.title;
   const displayChildren = isOpen ? children : cachedState?.children;
 
