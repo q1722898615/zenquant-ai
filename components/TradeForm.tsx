@@ -378,18 +378,28 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack, strategies, popular
                 ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
                 : 'opacity-0 h-0 p-0 m-0 overflow-hidden' // Hide if safe
           }`}>
-             <div className="flex-shrink-0 mt-0.5">
-               {!isMarginSafe ? '🚫' : '⚠️'}
+             <div className="flex-shrink-0 mt-0.5 text-lg">
+               {!isMarginSafe ? '🛑' : '⚠️'}
              </div>
              <div>
                <p className={`font-bold ${!isMarginSafe ? 'text-red-700 dark:text-red-400' : 'text-yellow-700 dark:text-yellow-400'}`}>
-                 保证金使用率: {marginUsage.toFixed(1)}%
+                 {!isMarginSafe ? '拒绝赌博式交易：止损过窄 / 仓位过大' : `保证金高占用警告: ${marginUsage.toFixed(1)}%`}
                </p>
-               <p className={`text-xs mt-1 ${!isMarginSafe ? 'text-red-600 dark:text-red-300' : 'text-yellow-600 dark:text-yellow-300'}`}>
-                 {!isMarginSafe 
-                   ? "保证金已超过账户余额 (100%)，请降低仓位、减少风险或增加杠杆。" 
-                   : "保证金占用超过 30%，建议保持轻仓以应对市场波动。"}
-               </p>
+               <div className={`text-xs mt-1 leading-relaxed ${!isMarginSafe ? 'text-red-600 dark:text-red-300' : 'text-yellow-600 dark:text-yellow-300'}`}>
+                 {!isMarginSafe ? (
+                   <>
+                     <p className="mb-1">
+                       当前<strong>止损距离太近</strong>，导致系统为了满足您的风险金额配置，计算出了超过本金的超大仓位。
+                     </p>
+                     <ul className="list-disc list-inside opacity-90 mt-1 space-y-0.5">
+                       <li>后果：极易被市场微小波动扫损（送钱行为）。</li>
+                       <li>建议：<strong>拉大止损距离</strong> 或 降低风险百分比。</li>
+                     </ul>
+                   </>
+                 ) : (
+                   "当前持仓占用超过 30% 本金。重仓是亏损的源头，建议保留更多资金以应对极端行情。"
+                 )}
+               </div>
              </div>
           </div>
         )}
@@ -401,7 +411,7 @@ export const TradeForm: React.FC<Props> = ({ onNext, onBack, strategies, popular
           disabled={!isFormValid}
           className={`w-full h-14 rounded-2xl font-bold text-lg tracking-wide transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 ${isFormValid ? 'bg-trade-accent text-white hover:bg-blue-600' : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'}`}
         >
-          {!isMarginSafe ? "保证金不足 · 无法执行" : "开始 AI 智能分析"}
+          {!isMarginSafe ? "止损过窄 · 风险过高" : "开始 AI 智能分析"}
         </button>
       </div>
     </div>
