@@ -9,10 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "recharts": "^3.6.0",
-    "@google/genai": "^1.34.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "recharts": "2.12.7",
+    "@google/genai": "0.1.1",
+    "framer-motion": "11.0.24",
+    "react-remove-scroll": "2.5.7"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
